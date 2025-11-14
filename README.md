@@ -8,12 +8,10 @@ Collection of Hudu Community Scripts for customers to use/run/remix.
   - [RBAC and Access Info](./Administration/RBAC-and-Access-Info/README.md)
   - [Storage Usage and Basic Health Info](./Administration/RBAC-and-Access-Info/README.md)
 
-- **Article Management**
-  - Articles From Anything
-
 - **Client Libraries**
   - PowerShell
     - [HuduAPI](https://github.com/Hudu-Technologies-Inc/HuduAPI/blob/master/README.md)
+    - [Articles-From-Anything](./Client-Libraries/Articles-From-Anything/README.md)
 
 - **Information and Visualization**
   - [Endpoint Self-Reporting](./Information-and-Visualization/Endpoint%20Self-Reporting/README.md)
