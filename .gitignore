@@ -1,0 +1,5 @@
+*environ*
+!*.example
+*.csv
+*.json
+*.log

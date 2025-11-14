@@ -1,0 +1,18 @@
+[submodule "Migrations/ITGlue-Hudu-Migration"]
+	path = Migrations/ITGlue-Hudu-Migration
+	url = https://github.com/Hudu-Technologies-Inc/ITGlue-Hudu-Migration.git
+[submodule "Migrations/SharePoint-Hudu-Migration"]
+	path = Migrations/SharePoint-Hudu-Migration
+	url = https://github.com/Hudu-Technologies-Inc/SharePoint-Hudu-Migrator.git
+[submodule "Migrations/Confluence-Hudu-Migration"]
+	path = Migrations/Confluence-Hudu-Migration
+	url = https://github.com/Hudu-Technologies-Inc/Confluence-Hudu-Migration.git
+[submodule "Migrations/PassPortal-Hudu-Migration"]
+	path = Migrations/PassPortal-Hudu-Migration
+	url = https://github.com/Hudu-Technologies-Inc/Hudu-PassPortal-Migration.git
+[submodule "Syncing-and-SIEM/Hudu-Microsoft-Fabric-Sync"]
+	path = Syncing-and-SIEM/Hudu-Microsoft-Fabric-Sync
+	url = https://github.com/Hudu-Technologies-Inc/Hudu-Microsoft-Fabric-Sync.git
+[submodule "Client-Libraries/PowerShell/HuduAPI"]
+	path = Client-Libraries/PowerShell/HuduAPI
+	url = https://github.com/Hudu-Technologies-Inc/HuduAPI.git
