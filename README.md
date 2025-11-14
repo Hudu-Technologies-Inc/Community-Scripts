@@ -4,9 +4,9 @@ Collection of Hudu Community Scripts for customers to use/run/remix.
 ---
 
 - **Administration**
-  - Dropdown to ListSelect
-  - RBAC and Access Info
-  - Storage Usage and Basic Health Info
+  - [Dropdown to ListSelect](./Administration/Dropdown-To-ListSelect/README.md)
+  - [RBAC and Access Info](./Administration/RBAC-and-Access-Info/README.md)
+  - [Storage Usage and Basic Health Info](./Administration/RBAC-and-Access-Info/README.md)
 
 - **Article Management**
   - Articles From Anything
@@ -16,9 +16,9 @@ Collection of Hudu Community Scripts for customers to use/run/remix.
     - [HuduAPI](https://github.com/Hudu-Technologies-Inc/HuduAPI/blob/master/README.md)
 
 - **Information and Visualization**
-  - Endpoint Self-Reporting
-  - Mapbox Locations Maps
-  - Network Maps Articles
+  - [Endpoint Self-Reporting](./Information-and-Visualization/Endpoint%20Self-Reporting/README.md)
+  - [Mapbox Locations Maps](./Information-and-Visualization/Mapbox%20Loctions%20Maps/README.md)
+  - [Network Maps Articles](./Information-and-Visualization/Network%20Maps%20Articles/README.md)
 
 - **Migrations**
   - [ITGlue → Hudu Migration](https://github.com/Hudu-Technologies-Inc/ITGlue-Hudu-Migration/blob/main/README.md)
@@ -28,5 +28,5 @@ Collection of Hudu Community Scripts for customers to use/run/remix.
 
 - **Syncing and SIEM**
   - [Hudu → Microsoft Fabric Sync](https://github.com/Hudu-Technologies-Inc/Hudu-Microsoft-Fabric-Sync/blob/main/README.md)
-  - Splunk-Sync
+  - [Hudu → Splunk Sync](./Syncing-and-SIEM/Splunk-Sync/README.md)
 
