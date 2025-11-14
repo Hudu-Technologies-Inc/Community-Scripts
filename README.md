@@ -13,7 +13,7 @@ Collection of Hudu Community Scripts for customers to use/run/remix.
 
 - **Client Libraries**
   - PowerShell
-    - HuduAPI
+    - [HuduAPI](https://github.com/Hudu-Technologies-Inc/HuduAPI/blob/master/README.md)
 
 - **Information and Visualization**
   - Endpoint Self-Reporting
@@ -21,11 +21,12 @@ Collection of Hudu Community Scripts for customers to use/run/remix.
   - Network Maps Articles
 
 - **Migrations**
-  - Confluence-Hudu-Migration
-  - ITGlue-Hudu-Migration
-  - PassPortal-Hudu-Migration
-  - SharePoint-Hudu-Migration
+  - [ITGlue → Hudu Migration](https://github.com/Hudu-Technologies-Inc/ITGlue-Hudu-Migration/blob/main/README.md)
+  - [SharePoint → Hudu Migration](https://github.com/Hudu-Technologies-Inc/SharePoint-Hudu-Migrator/blob/main/README.md)
+  - [Confluence → Hudu Migration](https://github.com/Hudu-Technologies-Inc/Confluence-Hudu-Migration/blob/main/README.md)
+  - [PassPortal → Hudu Migration](https://github.com/Hudu-Technologies-Inc/Hudu-PassPortal-Migration/blob/main/README.md)
 
 - **Syncing and SIEM**
-  - Hudu-Microsoft-Fabric-Sync
+  - [Hudu → Microsoft Fabric Sync](https://github.com/Hudu-Technologies-Inc/Hudu-Microsoft-Fabric-Sync/blob/main/README.md)
   - Splunk-Sync
+
