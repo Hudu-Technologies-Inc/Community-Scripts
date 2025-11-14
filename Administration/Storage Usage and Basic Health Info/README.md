@@ -4,65 +4,58 @@ Easily Keep Tabs on Important Key Hudu Health Metrics
 
 Tracking health information of your Hudu instance can be helpful for even those who aren't self-hosted.
 
-What gets Tracked
-Basic/Overall Info
+## What gets Tracked
 
-Current Version / Latest Version
+- **Overall System Information**
+  - Basic / Overall Info
+  - Current Version / Latest Version *(Is an update available?)*
+  - Self-Hosted Information
+    - If self-hosted, links for self-hosted upgrade documentation are provided
+    - Links to Docker image upgrades
+    - Links to Release Notes
+  - Hudu Reported Date
+    - The date reported by Hudu (especially useful for self-hosted instances)
+  - Web Redirects for HTTP
+    - Ensures all traffic is secure and no data is sent/received over non-TLS channels
 
-Is an Update Available?
+<img width="2112" height="830" alt="image" src="https://github.com/user-attachments/assets/a94fd280-c612-4601-9635-29ac57de5d9d" />
 
-If you're self-hosted Links for Self-Hosted Upgrades Docs are present, otherwise Help Information / Action item regarding Version is made available
+- **Uploads / Photos Statistics**
+  - Uploads by MIME Type / File Type
+    - Breakdown of how many files of each type exist
+  - Space Used per MIME Type / File Type
+    - How much disk space each type of file occupies
+  - Newest Files per MIME Type
+    - Recent uploads contributing to space usage
+  - Uploads Per Month
+    - How many uploads are added over time (month-over-month)
+  - Uploads per Relationship Type
+    - What each upload is associated with (company, asset, article, etc.)
+  - Top-Ten Largest Uploads by Size
+  - Photos by Relationship Type
+    - What photos are associated with
+  - Duplicated Upload Names
+    - Top 10 most frequent upload filenames  
+    - Useful for identifying duplicate uploads that may be deletable
 
-Link to new Docker image are provided
+<img width="2042" height="1774" alt="image" src="https://github.com/user-attachments/assets/9824cb00-1893-4027-86c5-4a5f0e9bb4d7" />
+<img width="2080" height="1190" alt="image" src="https://github.com/user-attachments/assets/c02fce85-1c60-4d7e-94e1-f5ec0b0de24d" />
 
-Links to Release notes are provided
+- **Article Statistics**
+  - Word Count (Largest)
+    - Which article contains the most words?
+  - Word Count (Smallest)
+    - Identifies articles that are empty or nearly empty
+  - Text Length (Longest)
+    - Helps identify articles with embedded base64 images or bloated content
+  - Text Length (Shortest)
+    - Helps find empty or unpopulated articles
+  - MIME Type Awareness
+    - Notes that MIME-type indicates document/file format for embedded content
 
-Hudu Reported Date - Date, as reported by Hudu. Can be useful for self-hosted information or just to see when this article was last updated
 
-Web Redirects for HTTP - this is important to make sure no data can be sent to/from Hudu over insecure / Non-TLS channels.
+## Setting Up
 
----
-
-Uploads / Photos Statistics
-
-Uploads By MIMEtype / Filetype - a breakdown of how many of which files are most prominent
-
-Space Used for each MimeType / Filetype - how much is used where?
-
-Newest Files per MimeType - Which files are contributing to these numbers as of late?
-
-Uploads Per Month - Over Time, how many uploads does your instance add ever month?
-
-Uploads per Relationship Type - What are all these uploads related to?
-
-Top-Ten largest Uploads by Size
-
-Duplicated Upload Names - Top 10 Most-Frequent Filenames for Uploads - How many of them are duplicates that can be removed?
-
-Photos by Relationship Type - What are all these photos related to?
-
----
-
-Articles Statistics
-
-Word Count, Largest - What article in my instance has the most words?
-
-Word Count, Smallest - Are there any articles that are empty or nearly empty?
-
-Text Length Longest -
-
-If there are any base64-embedded images, those can increase wait times when making database requests. This is a reliable way to find these
-
-Shortest Text Length - Great for finding empty or near-empty articles
-
-(Mime-Type is an identifier that specifies the format of a file or document)
-
-Setting Up
-Setting Up is easy, All you need to do is:
-
-Enter your Hudu Base URL in this variable, below
-
-Setting Up
 Setting Up is easy, All you need to do is:
 
 Enter your Hudu Base URL in this variable, below
