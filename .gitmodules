@@ -10,9 +10,9 @@
 [submodule "Migrations/PassPortal-Hudu-Migration"]
 	path = Migrations/PassPortal-Hudu-Migration
 	url = https://github.com/Hudu-Technologies-Inc/Hudu-PassPortal-Migration.git
-[submodule "Syncing and SIEM/Hudu-Microsoft-Fabric-Sync"]
-	path = Syncing and SIEM/Hudu-Microsoft-Fabric-Sync
+[submodule "Syncing-and-SIEM/Hudu-Microsoft-Fabric-Sync"]
+	path = Syncing-and-SIEM/Hudu-Microsoft-Fabric-Sync
 	url = https://github.com/Hudu-Technologies-Inc/Hudu-Microsoft-Fabric-Sync.git
-[submodule "Client Libraries/PowerShell/HuduAPI"]
-	path = Client Libraries/PowerShell/HuduAPI
+[submodule "Client-Libraries/PowerShell/HuduAPI"]
+	path = Client-Libraries/PowerShell/HuduAPI
 	url = https://github.com/Hudu-Technologies-Inc/HuduAPI.git
