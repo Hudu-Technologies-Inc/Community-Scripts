@@ -81,7 +81,7 @@ $HuduSetup = @{
 ```
 If you are on beta, you can switch the channel that you are checking as well. The only downside is that there are less tags available for beta and thus somewhat limited tag differentiation.
 
-If running continuously, you'll want to fill out your AZ keystore information for safe and continuous secrets management. We only need one secret for this one, $huduAPIKey. Set up the script to run on a schedule in Task Scheduler to runAs a user that can authenticate to AZ keystore.
+If running **continuously**, you'll want to fill out your AZ keystore information for safe and continuous secrets management. We only need one secret for this one, $huduAPIKey. Set up the script to run on a schedule in Task Scheduler to **runAs a user that can authenticate to AZ keystore**.
 
 ```
 $UseAZVault = $true
