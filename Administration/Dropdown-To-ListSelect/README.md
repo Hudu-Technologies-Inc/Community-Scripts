@@ -1,6 +1,6 @@
 # Converting Dropdowns into ***ListSelect***
 
-[original community post, Oct 2025](https://community.hudu.com/script-library-awpwerdu/post/turning-dropdowns-into-listselect-cWc6z7MFB91ZPAA)
+[original community post, Oct. 2025](https://community.hudu.com/script-library-awpwerdu/post/turning-dropdowns-into-listselect-cWc6z7MFB91ZPAA)
 
 #### '*why DropDown* **when you can ***ListSelect***?**' Well, now you don't have to!
 
