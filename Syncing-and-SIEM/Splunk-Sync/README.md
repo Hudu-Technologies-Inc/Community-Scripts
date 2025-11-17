@@ -1,5 +1,7 @@
 # Splunk Sync - Hudu Activity Logs
 
+[original community post, Aug 2025](https://community.hudu.com/script-library-awpwerdu/post/splunk-sync---hudu-activity-logs-wjuXUFGz8QNLHru)
+
 We've created a PowerShell script that allows you to import your Hudu logs into your Splunk Cloud instance.
 
 <img width="2994" height="1556" alt="image" src="https://github.com/user-attachments/assets/3d32acee-3709-4ab5-bbe9-a7858d24cca2" />
