@@ -140,8 +140,13 @@ function New-DocImageMap([object[]]$HuduImages) {
     if (-not $orig -or -not $url) { continue }
     $leaf = Split-Path -Leaf $orig
     $base = [IO.Path]::GetFileNameWithoutExtension($leaf)
-    foreach ($k in @($leaf,$base,[uri]::EscapeDataSxtring($leaf),[uri]::EscapeDataString($base))) {
-      if ($k -and -not $map.ContainsKey($k)) { $map[$k] = $url }
+    foreach ($k in @(
+        $leaf,
+        $base,
+        [uri]::EscapeDataString($leaf),
+        [uri]::EscapeDataString($base)
+    )) {
+        if ($k -and -not $map.ContainsKey($k)) { $map[$k] = $url }
     }
   }
   $map
@@ -291,45 +296,7 @@ function Set-HuduArticleFromHtml {
       $matchedCompany = ($created.company ?? $created)
     }
   }
-
-  # 2) Idempotent uploads (company-scoped if company present; else global KB)
-  $existingRelatedImages = if ($matchedCompany) {
-    Get-HuduUploads | Where-Object { $_.uploadable_type -eq 'Company' -and $_.uploadable_id -eq $matchedCompany.Id }
-  } else {
-    Get-HuduUploads
-  }
-  $ImagesArray = @($ImagesArray) | Where-Object { $_ -and (Test-Path -LiteralPath $_ -PathType Leaf) }
-
-  $HuduImages = @()
-  foreach ($ImageFile in $ImagesArray) {
-    if (-not (Test-Path -LiteralPath $ImageFile -PathType Leaf)) { continue }
-    $existingUpload = $null
-    $uploaded = $null
-    $imageFileName = ([IO.Path]::GetFileName($ImageFile)).Trim()
-
-    $existingUpload = $existingRelatedImages | Where-Object { $_.name -eq $imageFileName } | Select-Object -First 1
-    if (-not $existingUpload) {
-      $existingUpload = $existingRelatedImages | Where-Object { Test-Equiv -A $_.name -B $imageFileName } | Select-Object -First 1
-    }
-    $existingUpload = $existingUpload.upload ?? $existingUpload
-
-    if (-not $existingUpload) {
-      $uploaded = if ($matchedCompany) {
-        New-HuduUpload -FilePath $ImageFile -Uploadable_Id $matchedCompany.Id -Uploadable_Type 'Company'
-      } else {
-        # If your tenant supports KB-scoped uploads differently, adjust here:
-        New-HuduUpload -FilePath $ImageFile -Uploadable_Type 'Global'
-      }
-      $uploaded = $uploaded.upload ?? $uploaded
-    }
-
-    $usingImage = $existingUpload ?? $uploaded
-    if ($usingImage) {
-      $HuduImages += @{ OriginalFilename = $ImageFile; UsingImage = $usingImage }
-    }
-  }
-
-  # 3) Match or create article (company or global)
+  # 2. resolve or create article
   $allHududocuments = Get-HuduArticles
   $matchedDocument = if ($matchedCompany) {
     $allHududocuments | Where-Object { $_.company_id -eq $matchedCompany.id -and (Test-Equiv -A $_.name -B $Title) } | Select-Object -First 1
@@ -356,6 +323,38 @@ function Set-HuduArticleFromHtml {
   if (-not $articleUsed -or -not $articleUsed.id) {
     throw "Could not match or create article: '$Title' (Company: '$CompanyName')"
   }
+
+  # 2) Idempotent uploads (company-scoped if company present; else global KB)
+  $existingRelatedImages = Get-HuduUploads | Where-Object { $_.uploadable_type -eq 'Article' -and $_.uploadable_id -eq $articleUsed.Id }
+
+  $ImagesArray = @($ImagesArray) | Where-Object { $_ -and (Test-Path -LiteralPath $_ -PathType Leaf) }
+
+  $HuduImages = @()
+  foreach ($ImageFile in $ImagesArray) {
+    if (-not (Test-Path -LiteralPath $ImageFile -PathType Leaf)) { continue }
+    $existingUpload = $null
+    $uploaded = $null
+    $imageFileName = ([IO.Path]::GetFileName($ImageFile)).Trim()
+
+    $existingUpload = $existingRelatedImages | Where-Object { $_.name -eq $imageFileName } | Select-Object -First 1
+    if (-not $existingUpload) {
+      $existingUpload = $existingRelatedImages | Where-Object { Test-Equiv -A $_.name -B $imageFileName } | Select-Object -First 1
+    }
+    $existingUpload = $existingUpload.upload ?? $existingUpload
+
+    if (-not $existingUpload) {
+        New-HuduUpload -FilePath $ImageFile -Uploadable_Type 'Article' -Uploadable_Id $articleUsed.Id
+        $uploaded = $uploaded.upload ?? $uploaded
+    }
+
+    $usingImage = $existingUpload ?? $uploaded
+    if ($usingImage) {
+      $HuduImages += @{ OriginalFilename = $ImageFile; UsingImage = $usingImage }
+    }
+  }
+
+  # 3) Match or create article (company or global)
+
 
   # 4) Build maps for rewriting
   $imageMap   = New-DocImageMap -HuduImages $HuduImages
