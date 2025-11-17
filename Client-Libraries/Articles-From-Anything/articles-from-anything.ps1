@@ -277,7 +277,7 @@ function Set-HuduArticleFromHtml {
     [string]$CompanyName = "",                     # optional → global KB if ''
     [Parameter(Mandatory)][string]$Title,
     [Parameter(Mandatory)][string]$HtmlContents,
-    [switch]$CreateCompanyIfMissing = $true,
+    [switch]$CreateCompanyIfMissing = $false,
     [string]$HuduBaseUrl
   )
 
@@ -767,7 +767,8 @@ function Set-HuduArticleFromPDF {
   param(
     [Parameter(Mandatory)][string]$PdfPath,
     [string]$CompanyName,
-    [string]$Title
+    [string]$Title,
+    [bool]$includeOriginal=$true # include original pdf attached to converted article
   )
 
   if (-not (Test-Path -LiteralPath $PdfPath -PathType Leaf)) { write-warning "NO PDF, $($PdfPath)"; return $null }
@@ -784,6 +785,10 @@ function Set-HuduArticleFromPDF {
               -Title        $displayTitle `
               -HtmlContents $pdfData.Html `
               -HuduBaseUrl  (Get-HuduBaseURL)
+
+  if ($true -eq $includeOriginal){
+    New-HuduUpload -FilePath $PdfPath -Uploadable_Type 'Article' -Uploadable_Id $newDoc.HuduArticle.Id | Out-Null
+  }
 
   return $newDoc
 }
