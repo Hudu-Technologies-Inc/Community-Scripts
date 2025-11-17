@@ -1,6 +1,6 @@
 # Auditing RBAC, Password Folder Access, and Public Articles
 
-[original community post, Nov. 12, 2025](https://community.hudu.com/script-library-awpwerdu/post/auditing-rbac-password-folder-access-and-public-articles-hPZdQ3plgbvcMFb)
+[original community post, Nov. 2025](https://community.hudu.com/script-library-awpwerdu/post/auditing-rbac-password-folder-access-and-public-articles-hPZdQ3plgbvcMFb)
 
 It's always important to audit access levels and public data, especially when dealing with large swaths of client data or new access control features.
 
