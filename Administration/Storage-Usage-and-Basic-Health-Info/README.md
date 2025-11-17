@@ -2,6 +2,8 @@
 
 Easily Keep Tabs on Important Key Hudu Health Metrics
 
+[See Also: original community post, Oct 2025](https://community.hudu.com/script-library-awpwerdu/post/hudu-health-report-and-statistics-01coqpXffyYpINh)
+
 Tracking health information of your Hudu instance can be helpful for even those who aren't self-hosted.
 
 ## What gets Tracked
