@@ -1,5 +1,7 @@
 # Auditing RBAC, Password Folder Access, and Public Articles
 
+[original community post, Nov. 12, 2025](https://community.hudu.com/script-library-awpwerdu/post/auditing-rbac-password-folder-access-and-public-articles-hPZdQ3plgbvcMFb)
+
 It's always important to audit access levels and public data, especially when dealing with large swaths of client data or new access control features.
 
 There are *several angles to consider* - user permissions, group permissions, public articles, password folders, but this handy script can be a useful way to visualize some of these potential areas of improvement.
