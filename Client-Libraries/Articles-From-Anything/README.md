@@ -1,4 +1,7 @@
 # Creating Articles From Anything
+
+[original community post, Oct 2025](https://community.hudu.com/script-library-awpwerdu/post/auto-creating-articles-from-anything-AmwoEyoasGxfCot)
+
 Did you know there is a way to create articles in Hudu from just about any source with a single command?
 
 This can be a handy way to sync almost anything to an article in Hudu with little effort and maximum capability. With this, you can bulk-convert a folder of pdf's to articles, sync a status page to Hudu every 30 minutes, sync and make a directory listing for a shared folder available as an article, and more.
