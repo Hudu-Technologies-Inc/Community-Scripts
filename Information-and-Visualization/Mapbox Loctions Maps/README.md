@@ -1,5 +1,7 @@
 # Automatic Interactive Location Articles with Mapbox
 
+[original community post, Sep 2025](https://community.hudu.com/script-library-awpwerdu/post/automatic-interactive-location-articles-with-mapbox-iOld0VxsklFgAN1)
+
 For those of you that want to see all your locations at a glance in an interactive, multi-location map, here you go!
 This uses MapBox API for the geocoding data and for the Geographic Tiles, you just need to sign up and get a public access token. Everything you need for this is available with a Free account!
 
