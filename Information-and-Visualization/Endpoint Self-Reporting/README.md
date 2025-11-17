@@ -1,5 +1,7 @@
 # Self/Auto-Documenting Machines with Powershell
 
+[original community post: Sep 2025](https://community.hudu.com/script-library-awpwerdu/post/self-auto-documenting-machines-with-powershell-script-l415vHDIdMTWUEV)
+
 ## What it does:
 
 **This grabs and tracks information into a (new or existing) asset in Hudu! Including:**
