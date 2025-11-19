@@ -343,7 +343,7 @@ function Set-HuduArticleFromHtml {
     $existingUpload = $existingUpload.upload ?? $existingUpload
 
     if (-not $existingUpload) {
-        New-HuduUpload -FilePath $ImageFile -Uploadable_Type 'Article' -Uploadable_Id $articleUsed.Id
+        $uploaded = New-HuduUpload -FilePath $ImageFile -Uploadable_Type 'Article' -Uploadable_Id $articleUsed.Id
         $uploaded = $uploaded.upload ?? $uploaded
     }
 
