@@ -22,3 +22,6 @@
 	path = Client-Libraries/PowerShell/HuduAPI
 	url = https://github.com/Hudu-Technologies-Inc/HuduAPI.git
     branch = master
+[submodule "Migrations/Files-Hudu-Migration"]
+	path = Migrations/Files-Hudu-Migration
+	url = https://github.com/Hudu-Technologies-Inc/Files-Hudu-Migration.git

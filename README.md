@@ -20,9 +20,10 @@ Collection of Hudu Community Scripts for customers to use/run/remix.
 
 - **Migrations**
   - [ITGlue → Hudu Migration](https://github.com/Hudu-Technologies-Inc/ITGlue-Hudu-Migration/blob/main/README.md)
-  - [SharePoint → Hudu Migration](https://github.com/Hudu-Technologies-Inc/SharePoint-Hudu-Migrator/blob/main/README.md)
+  - [Files → Hudu Migration](https://github.com/Hudu-Technologies-Inc/Files-Hudu-Migration/blob/main/README.md)
   - [Confluence → Hudu Migration](https://github.com/Hudu-Technologies-Inc/Confluence-Hudu-Migration/blob/main/README.md)
   - [PassPortal → Hudu Migration](https://github.com/Hudu-Technologies-Inc/Hudu-PassPortal-Migration/blob/main/README.md)
+  - [SharePoint → Hudu Migration](https://github.com/Hudu-Technologies-Inc/SharePoint-Hudu-Migrator/blob/main/README.md)
   - [Migrating Assets Between Layouts](https://github.com/Hudu-Technologies-Inc/Community-Scripts/blob/main/Migrations/Migrating-Assets-Between-Layouts/README.md)
 
 - **Syncing and SIEM**
