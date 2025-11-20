@@ -8,7 +8,261 @@ if ($currentPSVersion -lt $RequiredPSversion) {
 } else {
     Write-Host "PowerShell version $currentPSVersion is compatible." -ForegroundColor Green
 }
+function Normalize-String {
+    param (
+        [Parameter(Mandatory = $true)]
+        [string]$InputString,
+        [switch]$PreserveWhitespace,
+        [switch]$PreserveExtension
+    )
+    $extension = ""
+    $basename = $InputString
+    if ($PreserveExtension) {
+        $extension = [IO.Path]::GetExtension($InputString)
+        $basename = [IO.Path]::GetFileNameWithoutExtension($InputString)
+    }
 
+    # Normalize Unicode (decompose accents), then remove non-ASCII
+    $normalized = $basename.Normalize([Text.NormalizationForm]::FormD)
+    $chars = $normalized.ToCharArray() | Where-Object {
+        ([Globalization.CharUnicodeInfo]::GetUnicodeCategory($_) -ne 'NonSpacingMark')
+    }
+    $ascii = -join $chars
+    if ($PreserveWhitespace) {
+        $ascii = $ascii -replace '[^a-zA-Z0-9 _-]', ''
+    } else {
+        $ascii = $ascii -replace '[^a-zA-Z0-9]', ''
+    }
+    return "$ascii$extension"
+}
+
+
+function Limit-FilenameLength {
+    param (
+        [string]$FullFilename,
+        [int]$MaxLength = 100,
+        [switch]$PreserveExtension
+    )
+
+    if ($PreserveExtension) {
+        $extension = [IO.Path]::GetExtension($FullFilename)
+        $basename = [IO.Path]::GetFileNameWithoutExtension($FullFilename)
+
+        $maxBaseLength = $MaxLength - $extension.Length
+        if ($basename.Length -gt $maxBaseLength) {
+            $basename = $basename.Substring(0, $maxBaseLength)
+        }
+
+        return "$basename$extension"
+    } else {
+        # Trim the entire string to max length regardless of extension
+        return if ($FullFilename.Length -gt $MaxLength) {
+            $FullFilename.Substring(0, $MaxLength)
+        } else {
+            $FullFilename
+        }
+    }
+}
+function Normalize-Text {
+    param([string]$s)
+    if ([string]::IsNullOrWhiteSpace($s)) { return $null }
+    $s = $s.Trim().ToLowerInvariant()
+    $s = [regex]::Replace($s, '[\s_-]+', ' ')  # "primary_email" -> "primary email"
+    # strip diacritics (prénom -> prenom)
+    $formD = $s.Normalize([System.Text.NormalizationForm]::FormD)
+    $sb = New-Object System.Text.StringBuilder
+    foreach ($ch in $formD.ToCharArray()){
+        if ([System.Globalization.CharUnicodeInfo]::GetUnicodeCategory($ch) -ne
+            [System.Globalization.UnicodeCategory]::NonSpacingMark) { [void]$sb.Append($ch) }
+    }
+    ($sb.ToString()).Normalize([System.Text.NormalizationForm]::FormC)
+}
+function Test-Equiv {
+    param([string]$A, [string]$B)
+    $a = Normalize-Text $A; $b = Normalize-Text $B
+    if (-not $a -or -not $b) { return $false }
+    if ($a -eq $b) { return $true }
+    $reA = "(^| )$([regex]::Escape($a))( |$)"
+    $reB = "(^| )$([regex]::Escape($b))( |$)"
+    if ($b -match $reA -or $a -match $reB) { return $true } 
+    if ($a.Replace(' ', '') -eq $b.Replace(' ', '')) { return $true }
+    return $false
+}
+
+function remove-hudupasswordfromfolder {
+    Param (
+        [Parameter(Mandatory = $true)]
+        [Int]$Id
+    )
+    $AssetPassword = [ordered]@{asset_password = $(Get-HuduPasswords -Id $Id) }
+    $AssetPassword.asset_password | Add-Member -MemberType NoteProperty -Name password_folder_id -Force -Value $null
+    Invoke-HuduRequest -Method put -Resource "/api/v1/asset_passwords/$Id" -Body $($AssetPassword | ConvertTo-Json -Depth 10)
+}
+
+function New-HuduGlobalPasswordFolder {
+    param ([Parameter(Mandatory)] [string]$Name)
+    try {
+        $res = Invoke-HuduRequest -Method POST -Resource "/api/v1/password_folders" -Body $(@{password_folder = @{name = $Name; security = "all_users"; allowed_groups  = @()}} | ConvertTo-Json -Depth 10)
+        return $res
+    } catch {
+        Write-Warning "Failed to create new password folder '$Name'- $_"; return $null;
+    }
+}
+function Normalize-Text {
+    param([string]$s)
+    if ([string]::IsNullOrWhiteSpace($s)) { return $null }
+    $s = $s.Trim().ToLowerInvariant()
+    $s = [regex]::Replace($s, '[\s_-]+', ' ')  # "primary_email" -> "primary email"
+    # strip diacritics (prénom -> prenom)
+    $formD = $s.Normalize([System.Text.NormalizationForm]::FormD)
+    $sb = New-Object System.Text.StringBuilder
+    foreach ($ch in $formD.ToCharArray()){
+        if ([System.Globalization.CharUnicodeInfo]::GetUnicodeCategory($ch) -ne
+            [System.Globalization.UnicodeCategory]::NonSpacingMark) { [void]$sb.Append($ch) }
+    }
+    ($sb.ToString()).Normalize([System.Text.NormalizationForm]::FormC)
+}
+function Get-Similarity {
+    param([string]$A, [string]$B)
+
+    $a = [string](Normalize-Text $A)
+    $b = [string](Normalize-Text $B)
+    if ([string]::IsNullOrEmpty($a) -and [string]::IsNullOrEmpty($b)) { return 1.0 }
+    if ([string]::IsNullOrEmpty($a) -or  [string]::IsNullOrEmpty($b))  { return 0.0 }
+
+    $n = [int]$a.Length
+    $m = [int]$b.Length
+    if ($n -eq 0) { return [double]($m -eq 0) }
+    if ($m -eq 0) { return 0.0 }
+
+    $d = New-Object 'int[,]' ($n+1), ($m+1)
+    for ($i = 0; $i -le $n; $i++) { $d[$i,0] = $i }
+    for ($j = 0; $j -le $m; $j++) { $d[0,$j] = $j }
+
+    for ($i = 1; $i -le $n; $i++) {
+        $im1 = ([int]$i) - 1
+        $ai  = $a[$im1]
+        for ($j = 1; $j -le $m; $j++) {
+            $jm1 = ([int]$j) - 1
+            $cost = if ($ai -eq $b[$jm1]) { 0 } else { 1 }
+
+            $del = [int]$d[$i,  $j]   + 1
+            $ins = [int]$d[$i,  $jm1] + 1
+            $sub = [int]$d[$im1,$jm1] + $cost
+
+            $d[$i,$j] = [Math]::Min($del, [Math]::Min($ins, $sub))
+        }
+    }
+
+    $dist   = [double]$d[$n,$m]
+    $maxLen = [double][Math]::Max($n,$m)
+    return 1.0 - ($dist / $maxLen)
+}
+function Get-SimilaritySafe { param([string]$A,[string]$B)
+    if ([string]::IsNullOrWhiteSpace($A) -or [string]::IsNullOrWhiteSpace($B)) { return 0.0 }
+    $score = Get-Similarity $A $B
+    write-host "$a ... $b SCORED $score"
+    return $score
+}
+
+function ChoseBest-ByName {
+    param ([string]$Name,[array]$choices,[string]$prop='name')
+return $($choices | ForEach-Object {
+[pscustomobject]@{Choice = $_; Score  = $(Get-SimilaritySafe -a "$Name" -b $(if ([string]::IsNullOrEmpty($prop)){$_} else {$_.$prop}))}} | where-object {$_.Score -ge 0.97} | Sort-Object Score -Descending | select-object -First 1).Choice
+}
+function Get-CastIfNumeric {
+    param(
+        [Parameter(Mandatory)]
+        [object]$Value
+    )
+
+    if ($Value -is [string]) {
+        $Value = $Value.Trim()
+    }
+
+    if ($Value -match '^[+-]?\d+(\.\d+)?$') {
+        try {
+            return [int][double]$Value
+        } catch {
+            return 0
+        }
+    }
+    return $Value
+}
+function Test-DateAfter {
+    param(
+        [Parameter(Mandatory)][string]$DateString,
+        [datetime]$Cutoff = [datetime]'1000-01-01'
+    )
+    $dt = $null
+    $ok = [datetime]::TryParseExact(
+        $DateString,
+        'yyyy-MM-dd',
+        [System.Globalization.CultureInfo]::InvariantCulture,
+        [System.Globalization.DateTimeStyles]::AssumeUniversal,
+        [ref]$dt
+    )
+    if (-not $ok) { return $false }   # invalid format → fail
+    return ($dt -ge $Cutoff)
+}
+
+function Get-CoercedDate {
+    param(
+        [Parameter(Mandatory)][string]$InputDate,
+        [datetime]$Cutoff = [datetime]'1000-01-01',
+        [ValidateSet('DD.MM.YYYY','YYYY.MM.DD','MM/DD/YYYY')]
+        [string]$OutputFormat = 'MM/DD/YYYY'
+    )
+
+    $Inv    = [System.Globalization.CultureInfo]::InvariantCulture
+    $Styles = [System.Globalization.DateTimeStyles]::AllowWhiteSpaces -bor `
+              [System.Globalization.DateTimeStyles]::AssumeLocal
+    $Accepted = [string[]]@('MM/dd/yyyy HH:mm:ss','MM/dd/yyyy hh:mm:ss tt')
+
+    $dt = $null
+    try {
+        if (-not [datetime]::TryParseExact($InputDate, $Accepted, $Inv, $Styles, [ref]$dt)) {
+            return $null
+        }
+    } catch { return $null }
+    if ($dt -lt $Cutoff) { return $null }
+
+    switch ($OutputFormat) {
+        'DD.MM.YYYY' { $dt.ToString('dd.MM.yyyy', $Inv) }
+        'YYYY.MM.DD' { $dt.ToString('yyyy.MM.dd', $Inv) }
+        'MM/DD/YYYY' { $dt.ToString('MM/dd/yyyy', $Inv) }
+    }
+}
+
+function Get-NormalizedDropdownOptions {
+  param([Parameter(Mandatory)]$OptionsRaw)
+  $lines =
+    if ($null -eq $OptionsRaw) { @() }
+    elseif ($OptionsRaw -is [string]) { $OptionsRaw -split "`r?`n" }
+    elseif ($OptionsRaw -is [System.Collections.IEnumerable]) { @($OptionsRaw) }
+    else { @("$OptionsRaw") }
+
+  $seen = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+  $out = New-Object System.Collections.Generic.List[string]
+  foreach ($l in $lines) {
+    $x = "$l".Trim()
+    if ($x -ne "" -and $seen.Add($x)) { $out.Add($x) }
+  }
+  if ($out.Count -eq 0) { @('None','N/A') } elseif ($out.Count -eq 1) { @('None',$out[0] ?? "N/A") } else { $out.ToArray() }
+}
+function Get-UniqueListName {
+  param([Parameter(Mandatory)][string]$BaseName,[bool]$allowReuse=$false)
+
+  $name = $BaseName.Trim()
+  $i = 0
+  while ($true) {
+    $existing = Get-HuduLists -name $name
+    if (-not $existing) { return $name }
+    if ($existing -and $true -eq $allowReuse) {return $existing}
+    $i++
+    $name = "{0}-{1}" -f $BaseName.Trim(), $i
+  }
+}
 function Set-SmooshAssetFieldsToField {
     param (
         [PSCustomObject]$sourceAsset,
@@ -242,12 +496,17 @@ function build-templatemap {
 param ([array]$destfields,[string]$mapfile)
 # Build entries like: @{from='';to='Some Label'}
 $mapEntries = foreach ($f in $destfields) {
-    if ($f.field_type -eq "AssetTag") {write-host "Skipping asset tag for $($f.label), those will be relinked."; continue}
+    if ($f.field_type -eq "AssetTag") {write-host "Skipping asset tag for $($f.label), those will be relinked as relations"; continue}
 
     $toEsc = ([string]$f.label) -replace "'", "''"  # double single-quotes inside single-quoted PS strings
     $desttype = ([string]$($f.field_type ?? $f.type)) -replace "'", "''"  # double single-quotes inside single-quoted PS strings
     $req = ([string]$($f.required ?? $false)) -replace "'", "''"  # double single-quotes inside single-quoted PS strings
-    if ($desttype -eq "AddressData") {
+    if ($desttype -eq "ListSelect") {
+        $ListItems = $(Get-HuduLists -id $f.list_id).list_items.name | Foreach-Object {"'$_'=@{whenvalues=@()}"}
+"@{to='$toEsc'; from=''; add_listitems='false'; list_id=$($f.list_id); dest_type='ListSelect'; required='$req'; Mapping=@{
+$($listitems -join "`n")
+}}"
+    } elseif ($desttype -eq "AddressData") {
         "@{to='$toEsc'; from='Meta'; dest_type='AddressData'; required='$req'; address=@{
                 address_line_1=@{from=''}
                 address_line_2=@{from=''}
@@ -311,13 +570,27 @@ function Select-ObjectFromList($objects, $message, $inspectObjects = $false, $al
         }
     }
 }
+function Get-NormalizedDropdownOptions {
+  param([Parameter(Mandatory)]$OptionsRaw)
+  $lines =
+    if ($null -eq $OptionsRaw) { @() }
+    elseif ($OptionsRaw -is [string]) { $OptionsRaw -split "`r?`n" }
+    elseif ($OptionsRaw -is [System.Collections.IEnumerable]) { @($OptionsRaw) }
+    else { @("$OptionsRaw") }
+
+  $seen = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+  $out = New-Object System.Collections.Generic.List[string]
+  foreach ($l in $lines) {
+    $x = "$l".Trim()
+    if ($x -ne "" -and $seen.Add($x)) { $out.Add($x) }
+  }
+  if ($out.Count -eq 0) { @('None','N/A') } elseif ($out.Count -eq 1) { @('None',$out[0] ?? "N/A") } else { $out.ToArray() }
+}
 function Get-FieldValueByLabel {
     param([array]$Fields, [string]$Label)
     if (-not $Label) { return $null }
     ($Fields | Where-Object { $_.label -eq $Label } | Select-Object -First 1).value
 }
-
-
 function Normalize-Region {
     param([string]$State)
     if (-not $State) { return $null }
@@ -455,6 +728,86 @@ function Set-LayoutsForTransfer {
         }
     }
 }
+function Set-MappedListSelectItemFromuserMapping {
+    [OutputType([hashtable])]
+    [CmdletBinding()]
+    param(
+        # Hashtable of key → string[] (whenvalues)
+        [Parameter(Mandatory)]
+        [hashtable]$Mapping,
+
+        # Raw field value (field.value from the source asset)
+        [Parameter(Mandatory)]
+        $RawValue,
+
+        # Optional: for list_id → label resolution (if needed later)
+        [Parameter()]
+        [hashtable]$SourceListItemMap,
+
+        [Parameter()]
+        [string]$FieldLabel
+    )
+
+    $result = @{
+        MatchFound   = $false
+        Key          = $null        # destination list item label, e.g. 'these options'
+        Normalized   = $RawValue    # coerced/clean value used for comparison
+        NeedsNewItem = $true
+    }
+
+    # --- 1. Normalize / coerce list_id JSON if present ---
+    $listItemValue = $RawValue
+    if ("$RawValue" -ilike '*list_id*') {
+        try {
+            $listItemId = ($RawValue | ConvertFrom-Json).list_ids[0]
+
+
+            $mapped = $null
+
+            if ($FieldLabel) {
+                $mapped = (Get-HuduLists -Name $FieldLabel).list_items |
+                          Where-Object { $_.id -eq $listItemId } |
+                          Select-Object -ExpandProperty name -ErrorAction SilentlyContinue
+            }
+
+            if ($mapped) { $listItemValue = $mapped }
+        }
+        catch {
+            Write-Host "Error transforming list_id source value '$RawValue' — $_"
+        }
+    }
+
+    $result.Normalized = $listItemValue
+    $normalizedListItemValue = Remove-HtmlTags -InputString "$listItemValue"
+
+    # --- 2. Filter mappings to only non-empty whenvalues arrays ---
+    $nonEmptyMappings = $Mapping.GetEnumerator() | Where-Object {
+        $_.Value -and ($_.Value | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    }
+
+    if ($nonEmptyMappings.Count -eq 0) {
+        return $result
+    }
+
+    # --- 3. Try to match: find key whose whenvalues contains our value ---
+    foreach ($entry in $nonEmptyMappings) {
+        $keyName   = $entry.Key          # e.g. 'these options' / 'milk'
+        $whenvalues = $entry.Value       # string[] like @('cloud','cloud service')
+
+        foreach ($potentialMatch in $whenvalues) {
+            if ($(Test-Equiv -A "$potentialMatch" -B "$listItemValue") -or $(Test-Equiv -A "$potentialMatch" -B "$normalizedListItemValue")) {
+
+                $result.MatchFound   = $true
+                $result.Key          = $keyName   # <- THIS is what Hudu wants
+                $result.NeedsNewItem = $false
+                return $result
+            }
+        }
+    }
+
+    # No match
+    return $result
+}
 function Write-ErrorObjectsToFile {
     param (
         [Parameter(Mandatory)]
@@ -558,32 +911,66 @@ if ($(test-path "$mapfile")) {
 
 # get fields mapped and ready
 $srcfields=@()
-foreach ($field in $sourceassetlayout.fields | Where-Object {$_.field_type -ne "AssetTag"}) {
-    $srcfields+=@{label = $field.label; type = $field.field_type; required = $($field.required ?? $false)}
+$sourceListItemMap = @{}
+foreach ($field in $sourceassetlayout.fields | Where-Object {$_.field_type -ne "AssetTag"}) { # assettag fields are carried over as relationships
+    if ($field.field_type -eq "ListSelect" -and $null -ne $field.list_id){
+        $typicalValues = $(Get-HuduLists -id $field.list_id).list_items ?? @()
+        $sourceListItemMap["$($field.label)"]=$typicalValues.name
+        $srcfields+=@{label = $field.label; field_type = $field.field_type; list_id=$field.list_id; typicalValues=$typicalValues; required = $($field.required ?? $false)}
+    } elseif ($field.field_type -eq 'DropDown' -and -not ([string]::IsNullOrEmpty($field.options))){
+        $typicalValues = $(Get-NormalizedDropdownOptions $field.options) ?? @()
+        $srcfields+=@{label = $field.label; field_type = $field.field_type; typicalValues=$typicalValues; required = $($field.required ?? $false)}
+    } else {
+        $srcfields+=@{label = $field.label; type = $field.field_type; required = $($field.required ?? $false)}
+    }
 }
 $dstfields=@()
-foreach ($field in $destassetlayout.fields | Where-Object {$_.field_type -ne "ListSelect"}) {
-    $dstfields+=@{label = $field.label; field_type = $field.field_type; required = $($field.required ?? $false)}
+foreach ($field in $destassetlayout.fields) {
+    if ($field.field_type -eq "ListSelect" -and $null -ne $field.list_id){
+        $dstfields+=@{label = $field.label; field_type = $field.field_type; list_id=$field.list_id; required = $($field.required ?? $false)}
+    } else {
+        $dstfields+=@{label = $field.label; field_type = $field.field_type; required = $($field.required ?? $false)}
+    }
 }
+
+
 foreach ($fields in @(@{name="source"; value=$srcfields}, @{name="dest"; value=$dstfields})) {
     $fields.value | convertto-json -depth 66 | out-file "$($fields.name)-fields.json"
 }
 build-templatemap -destfields $dstfields -mapfile $mapfile
 
+
 read-host "press enter if you filled in your mapfile, $mapfile"
-if (-not $(test-path "$mapfile")) {
-    exit
+while ($true) {
+    if (-not $(test-path "$mapfile")) {
+        read-host "mapfile not found, please ensure it is in working directory, $mapfile, and press enter to continue"
+    }    
+    try {
+        . .\$mapfile
+        break
+    } catch {
+        read-host "your mapfile has error: $_ please update, save, and press enter to try again."
+    }
 }
-. .\$mapfile
 
 $sourcedestlabels = @{}
 $sourcedestrequired = @{}
 $sourcedestStripHTML = @{}
 $sourceDestDataType = @{}
 $addressMapsByDest    = @{} 
-
+$ListSelectEquivilencyMaps = @{}
 foreach ($entry in $mapping) {
-    if ($entry.dest_type -eq 'AddressData') {
+    if ($entry.dest_type -eq 'ListSelect' -and -not ([string]::IsNullOrWhiteSpace($entry.from))) {
+        $parsedMap = @{}
+        $entry.Mapping.GetEnumerator().Where({$_.Value.whenvalues?.Count -gt 0}).ForEach({
+            $parsedMap[$_.Key] = $_.Value.whenvalues
+        })
+        $ListSelectEquivilencyMaps[$entry.to]=@{Mapping = $parsedMap; list_options=$($entry.Mapping.Keys); list_id=$entry.list_id; add_listitems=$("$($entry.add_listitems)" -ilike "t*" ?? $false)}
+        $sourcedestlabels[$entry.from] = $entry.to
+        $sourcedestStripHTML[$entry.from] = [bool]$(@('t','true','y','yes') -contains "$($entry.striphtml ?? "true")".ToLower())
+        $sourceDestDataType[$entry.from] = 'ListSelect'
+        continue
+    } elseif ($entry.dest_type -eq 'AddressData') {
         $addressMapsByDest[$entry.to] = $entry.address
         $sourcedestrequired[$entry.from] = $false
         $sourceDestDataType[$entry.from] = 'AddressData'
@@ -615,6 +1002,11 @@ if ($CONSTANTS) {
         write-host "Dest Labels containing $($c.to_label) will be given static value from literal $($c.literal) as literal value!"
     }
 } else {write-host "No constants mapped"}
+
+if ($ListSelectEquivilencyMaps.Keys.count -gt 0){
+    Write-host "$($ListSelectEquivilencyMaps.Keys.count) listselect target items mapped for $($ListSelectEquivilencyMaps.Keys -join ",")"
+}
+
 $totalcounts = @{
     fromablescreated=0
     toablescreated=0
@@ -661,11 +1053,12 @@ foreach ($originalasset in $sourceassets) {
     }
 
     foreach ($field in $originalasset.fields) {
+        # acquire destination information
         $transformedlabel = $sourcedestlabels[$field.label] ?? $null
         $destTranslationFieldRequired = $("$($sourcedestrequired[$field.label])".ToLower() -eq 'true') ?? $false
         $stripHTML = $($sourcedestStripHTML["$($field.label)"] ?? $false)
         $destFieldType = $sourceDestDataType["$($field.label)"] ?? 'Text'
-        
+
         if (-not $transformedlabel -or $null -eq $transformedlabel) {continue}
         if (-not $field.value -or $null -eq $field.value) {
                 write-host "no translate for $($field.label)";
@@ -676,6 +1069,41 @@ foreach ($originalasset in $sourceassets) {
                     write-host "no value for optional $($field.label) => $transformedlabel"
                     continue
                 }
+        }
+        # handle listselect/dropdown mappings if present
+        if ($ListSelectEquivilencyMaps.Keys -contains $transformedlabel) {
+            $valueEquivilencies = $ListSelectEquivilencyMaps[$transformedlabel]
+            $mapping            = $valueEquivilencies.Mapping
+        } else {
+            $valueEquivilencies = $null
+        }
+
+        if (-not $valueEquivilencies -or -not $mapping) {
+            write-host "No list mapping for $($field.label) => $transformedlabel, continuing normal mapping"
+        } else {
+
+
+            $result = Set-MappedListSelectItemFromuserMapping `
+                -Mapping $mapping `
+                -RawValue $field.value `
+                -SourceListItemMap $sourceListItemMap `
+                -FieldLabel $field.label
+
+            if ($result.MatchFound) {
+                Write-Host "$transformedlabel value '$($field.value)' mapped to listselect item '$($result.Key)'"
+                $transformedFields += @{ $transformedlabel = $result.Key }
+
+            } elseif ($valueEquivilencies.add_listitems -eq $true -or $valueEquivilencies.add_listitems -ilike '*t*') {
+
+                Write-Host "'$($field.value)' not found in list item matches, adding to list items for list id $($valueEquivilencies.list_id)"
+                $NewOptions = @($valueEquivilencies.list_options) + @("$($field.value)")
+                Set-HuduList -Id $valueEquivilencies.list_id -ListItems $NewOptions
+                $transformedFields += @{ $transformedlabel = $field.value }
+
+            } else {
+                Write-Host "No value matches for list id $($valueEquivilencies.list_id) from '$($field.value)' / '$($result.Normalized)'; not configured to add list items, so leaving empty."
+            }
+            continue
         }
         
         if ($true -eq $stripHTML) {
