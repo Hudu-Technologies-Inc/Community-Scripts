@@ -14,9 +14,11 @@ Collection of Hudu Community Scripts for customers to use/run/remix.
     - [Articles-From-Anything](./Client-Libraries/Articles-From-Anything/README.md)
 
 - **Information and Visualization**
-  - [Endpoint Self-Reporting](./Information-and-Visualization/Endpoint%20Self-Reporting/README.md)
-  - [Mapbox Locations Maps](./Information-and-Visualization/Mapbox%20Loctions%20Maps/README.md)
-  - [Network Maps Articles](./Information-and-Visualization/Network%20Maps%20Articles/README.md)
+  - [Endpoint Self-Reporting](./Information-and-Visualization/Endpoint-Self-Reporting/README.md)
+  - [Mapbox Locations Maps](./Information-and-Visualization/Mapbox-Loctions-Maps/README.md)
+  - [Network Maps Articles](./Information-and-Visualization/Network-Maps-Articles/README.md)
+  - [Integrations Tracking](./Information-and-Visualization/Integrations-Tracking/README.md)
+
 
 - **Migrations**
   - [ITGlue → Hudu Migration](https://github.com/Hudu-Technologies-Inc/ITGlue-Hudu-Migration/blob/main/README.md)
