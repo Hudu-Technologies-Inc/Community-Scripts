@@ -158,18 +158,8 @@ function Get-Similarity {
     $maxLen = [double][Math]::Max($n,$m)
     return 1.0 - ($dist / $maxLen)
 }
-function Get-SimilaritySafe { param([string]$A,[string]$B)
-    if ([string]::IsNullOrWhiteSpace($A) -or [string]::IsNullOrWhiteSpace($B)) { return 0.0 }
-    $score = Get-Similarity $A $B
-    write-host "$a ... $b SCORED $score"
-    return $score
-}
 
-function ChoseBest-ByName {
-    param ([string]$Name,[array]$choices,[string]$prop='name')
-return $($choices | ForEach-Object {
-[pscustomobject]@{Choice = $_; Score  = $(Get-SimilaritySafe -a "$Name" -b $(if ([string]::IsNullOrEmpty($prop)){$_} else {$_.$prop}))}} | where-object {$_.Score -ge 0.97} | Sort-Object Score -Descending | select-object -First 1).Choice
-}
+
 function Get-CastIfNumeric {
     param(
         [Parameter(Mandatory)]
@@ -208,23 +198,55 @@ function Test-DateAfter {
 
 function Get-CoercedDate {
     param(
-        [Parameter(Mandatory)][string]$InputDate,
+        [Parameter(Mandatory)]
+        [object]$InputDate,  # allow string or [datetime]
+
         [datetime]$Cutoff = [datetime]'1000-01-01',
+
         [ValidateSet('DD.MM.YYYY','YYYY.MM.DD','MM/DD/YYYY')]
         [string]$OutputFormat = 'MM/DD/YYYY'
     )
 
-    $Inv    = [System.Globalization.CultureInfo]::InvariantCulture
-    $Styles = [System.Globalization.DateTimeStyles]::AllowWhiteSpaces -bor `
-              [System.Globalization.DateTimeStyles]::AssumeLocal
-    $Accepted = [string[]]@('MM/dd/yyyy HH:mm:ss','MM/dd/yyyy hh:mm:ss tt')
+    $Inv = [System.Globalization.CultureInfo]::InvariantCulture
 
-    $dt = $null
-    try {
-        if (-not [datetime]::TryParseExact($InputDate, $Accepted, $Inv, $Styles, [ref]$dt)) {
-            return $null
+    # 1) If it's already a DateTime, trust it
+    if ($InputDate -is [datetime]) {
+        $dt = [datetime]$InputDate
+    }
+    else {
+        $text = "$InputDate".Trim()
+        if ([string]::IsNullOrWhiteSpace($text)) { return $null }
+
+        # 2) Try strict formats first via ParseExact
+        $formats = @(
+            'MM/dd/yyyy HH:mm:ss'
+            'MM/dd/yyyy hh:mm:ss tt'
+            'MM/dd/yyyy'
+        )
+
+        $dt   = $null
+        $ok   = $false
+
+        foreach ($fmt in $formats) {
+            try {
+                $dt = [System.DateTime]::ParseExact($text, $fmt, $Inv)
+                $ok = $true
+                break
+            } catch {
+                # ignore and try next format
+            }
         }
-    } catch { return $null }
+
+        # 3) Fallback: general Parse (handles lots of “normal” date strings)
+        if (-not $ok) {
+            try {
+                $dt = [System.DateTime]::Parse($text, $Inv)
+            } catch {
+                return $null
+            }
+        }
+    }
+
     if ($dt -lt $Cutoff) { return $null }
 
     switch ($OutputFormat) {
@@ -263,6 +285,58 @@ function Get-UniqueListName {
     $name = "{0}-{1}" -f $BaseName.Trim(), $i
   }
 }
+
+function Get-CastIfBoolean {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [object]$Value,
+
+        [array]$trueVals  = @("true","t","yes","y","1","on"),# Accepted truthy keyword mappings
+        [array]$falseVals = @("false","f","no","n","0","off"), # Accepted falsey keyword mappings
+        [bool]$allowFuzzy=$true
+    )
+    if ($Value -is [string]) {
+        $Value = $Value.Trim()
+        if ([string]::IsNullOrWhiteSpace($Value)) { return $null }
+    }
+
+    # Already a real boolean? return it
+    if ($Value -is [bool]) {
+        return $Value
+    }
+
+    if ($Value -is [int] -or $Value -is [long] -or $Value -is [double] -or $Value -is [decimal]) {
+        if ([int]$Value -eq 1) { return $true }
+        if ([int]$Value -eq 0) { return $false }
+        return $null
+    }
+    if ($Value -is [string]) {
+        $lower = $Value.ToLowerInvariant()
+
+        if ($trueVals  -contains $lower) { return $true }
+        if ($falseVals -contains $lower) { return $false }
+        if ($true -eq $allowFuzzy){
+            foreach ($t in $truevals){
+                if ($value -ilike "*$t" -or $value -ilike "$t*") {return $true}
+            }
+            foreach ($f in $falseVals){
+                if ($value -ilike "*$f" -or $value -ilike "$f*") {return $false}
+            }
+            foreach ($t in $truevals){
+                if ($value -ilike "*$t*") {return $true}
+            }
+            foreach ($f in $falseVals){
+                if ($value -ilike "*$f*") {return $false}
+            }            
+        }
+
+
+        return $null
+    }
+    return $null
+}
+
 function Set-SmooshAssetFieldsToField {
     param (
         [PSCustomObject]$sourceAsset,
@@ -342,26 +416,34 @@ function Get-SmooshedLinkableDescription {
     param (
         [array]$linkableObjects
     )
-    $description=""
-    if (-not $linkableObjects -or $linkableObjects.count -lt 1) {
+
+    if (-not $linkableObjects -or $linkableObjects.Count -lt 1) {
         return ""
     }
 
+    $description = ""
+
     foreach ($linkable in $linkableObjects) {
-        if ($linkable.linkedasset.url){
-        $descriptor=@"
+        if ($linkable.LinkedAsset -and $linkable.LinkedLayout) {
+            $summary = "Related $($linkable.LinkedLayout.name) - $($linkable.LinkedAsset.name)"
+            if ($linkable.LinkedAsset.url) {
+                $descriptor = @"
 <br><hr>
-<a href='$($linkable.linkedasset.url)'>Related $($linkable.LinkedLayout.name) - $($linkable.LinkedAsset.name)</a>
+<a href='$($linkable.LinkedAsset.url)'>$summary</a>
 "@
-} else {
-        $descriptor=@"
-Related $($linkable.LinkedLayout.name) - $($linkable.LinkedAsset.name)
-"@    
+            } else {
+                $descriptor = @"
+<br><hr>
+$summary
+"@
+            }
+            $description += $descriptor
+        }
     }
-    $Description = "$( ($_.fields | Where-Object {$_.required}).Count ) required fields, $( ($_.fields | Where-Object {-not $_.required}).Count ) optional fields ..."
-    }
+
     return $description
 }
+
 function Get-HuduModule {
     param (
         [string]$HAPImodulePath = "C:\Users\$env:USERNAME\Documents\GitHub\HuduAPI\HuduAPI\HuduAPI.psm1",
@@ -402,7 +484,7 @@ function Set-HuduInstance {
         $((Read-Host -Prompt 'Set the base domain of your Hudu instance (e.g https://myinstance.huducloud.com)') -replace '[\\/]+$', '') -replace '^(?!https://)', 'https://'
     $HuduAPIKey = $HuduAPIKey ?? "$(read-host "Please Enter Hudu API Key")"
     while ($HuduAPIKey.Length -ne 24) {
-        $HuduAPIKey = (Read-Host -Prompt "Get a Hudu API Key from $($settings.HuduBaseDomain)/admin/api_keys").Trim()
+        $HuduAPIKey = (Read-Host -Prompt "Get a Hudu API Key from $(Get-HuduBaseUrl)/admin/api_keys").Trim()
         if ($HuduAPIKey.Length -ne 24) {
             Write-Host "This doesn't seem to be a valid Hudu API key. It is $($HuduAPIKey.Length) characters long, but should be 24." -ForegroundColor Red
         }
@@ -692,6 +774,83 @@ function Write-InspectObject {
     }
     return $lines -join "`n"
 }
+function Test-DateAfter {
+    param(
+        [Parameter(Mandatory)][string]$DateString,
+        [datetime]$Cutoff = [datetime]'1000-01-01'
+    )
+    $dt = $null
+    $ok = [datetime]::TryParseExact(
+        $DateString,
+        'yyyy-MM-dd',
+        [System.Globalization.CultureInfo]::InvariantCulture,
+        [System.Globalization.DateTimeStyles]::AssumeUniversal,
+        [ref]$dt
+    )
+    if (-not $ok) { return $false }   # invalid format → fail
+    return ($dt -ge $Cutoff)
+}
+
+function Get-CoercedDate {
+    param(
+        [Parameter(Mandatory)]
+        [object]$InputDate,  # allow string or [datetime]
+
+        [datetime]$Cutoff = [datetime]'1000-01-01',
+
+        [ValidateSet('DD.MM.YYYY','YYYY.MM.DD','MM/DD/YYYY')]
+        [string]$OutputFormat = 'MM/DD/YYYY'
+    )
+
+    $Inv = [System.Globalization.CultureInfo]::InvariantCulture
+
+    if ($InputDate -is [datetime]) {
+        $dt = [datetime]$InputDate
+    }
+    else {
+        $text = "$InputDate".Trim()
+        if ([string]::IsNullOrWhiteSpace($text)) { return $null }
+
+        # 2) Try strict formats first via ParseExact
+        $formats = @(
+            'MM/dd/yyyy HH:mm:ss'
+            'MM/dd/yyyy hh:mm:ss tt'
+            'MM/dd/yyyy'
+        )
+
+        $dt   = $null
+        $ok   = $false
+
+        foreach ($fmt in $formats) {
+            try {
+                $dt = [System.DateTime]::ParseExact($text, $fmt, $Inv)
+                $ok = $true
+                break
+            } catch {
+                # ignore and try next format
+            }
+        }
+
+        # 3) Fallback: general Parse (handles lots of “normal” date strings)
+        if (-not $ok) {
+            try {
+                $dt = [System.DateTime]::Parse($text, $Inv)
+            } catch {
+                return $null
+            }
+        }
+    }
+
+    if ($dt -lt $Cutoff) { return $null }
+
+    switch ($OutputFormat) {
+        'DD.MM.YYYY' { $dt.ToString('dd.MM.yyyy', $Inv) }
+        'YYYY.MM.DD' { $dt.ToString('yyyy.MM.dd', $Inv) }
+        'MM/DD/YYYY' { $dt.ToString('MM/dd/yyyy', $Inv) }
+    }
+}
+
+
 function Set-LayoutsForTransfer {
     param ($allLayouts)
     $layoutMap = @{}
@@ -701,7 +860,7 @@ function Set-LayoutsForTransfer {
     $layoutSummaries = $allLayouts  | ForEach-Object {
         [PSCustomObject]@{
             ID          = $_.id
-            Description = "$($($_.fields | where-object {$_.required -and $required -eq $true}).Count) required fields, $($($_.fields | where-object {-not $_.required -or $required -eq $false}).Count) optional fields and $($_.assetsInLayoutCount) assets present, originally created at $($_.created_at)"
+            OptionMessage = "$($_.name): $( ($_.fields).Count ) fields with $($_.assetsInLayoutCount) assets present"
             Name        = $_.name
     }}
     write-host "$(if ($layoutSummaries.count -ne $allLayouts.count) {
@@ -712,7 +871,7 @@ function Set-LayoutsForTransfer {
     $sourceLayout = $null
     $destLayout = $null
     while ($true) {
-        $sourceSummary = Select-ObjectFromList -objects $layoutSummaries -message "Which source / origin asset layout? [layouts without assets omitted for source]" -allowNull $false -inspectObjects $inspectlayouts
+        $sourceSummary = Select-ObjectFromList -objects $layoutSummaries -message "Which source / origin asset layout?" -allowNull $false -inspectObjects $inspectlayouts
         $sourceLayout  = $layoutMap[$sourceSummary.ID]
 
         $destSummaries = $layoutSummaries | Where-Object { $_.ID -ne $sourceLayout.id }
@@ -726,6 +885,30 @@ function Set-LayoutsForTransfer {
         } else {
             Write-Host "Opting to re-select."
         }
+    }
+}
+
+function Get-SourceListItemNameFieldFromID {
+    param ([string]$RawValue,[string]$FieldLabel)
+    if ([string]::IsNullOrWhiteSpace($RawValue)){return $null}
+    $mapped = $null
+    if ("$RawValue" -ilike '*list_id*') {
+        try {
+            $listItemId = ($RawValue | ConvertFrom-Json).list_ids[0]
+            if ($FieldLabel) {
+                $mapped = (Get-HuduLists -Name $FieldLabel).list_items |
+                          Where-Object { $_.id -eq $listItemId } |
+                          Select-Object -ExpandProperty name -ErrorAction SilentlyContinue
+            }
+            if ($mapped) { return $mapped }
+        }
+        catch {
+            Write-Host "Error transforming list_id source value '$RawValue' — $_"
+            return $mapped
+        }
+    } else {
+        Write-Host "list item is presumed human-readable"
+        return $RawValue
     }
 }
 function Set-MappedListSelectItemFromuserMapping {
@@ -891,7 +1074,7 @@ foreach ($layout in $assetlayouts) {$layout | Add-Member -NotePropertyName asset
 #     write-host "archiving emtpy layout $($layout.name)"
 #     Set-HuduAssetLayout -id $layout.id -Active $false
 # }
-$assetlayouts=$assetlayouts | where-object {$_.assetsInLayoutCount -gt 0}
+$assetlayouts=$assetlayouts # | where-object {$_.assetsInLayoutCount -gt 0}
 $assetlayouts = $assetlayouts | Sort-Object Name
 $usablelayouts = $assetlayouts.count
 write-host "$($totallayouts - $usablelayouts) omitted and marked inactive. $totallayouts available layouts."
@@ -953,12 +1136,10 @@ while ($true) {
     }
 }
 
-$sourcedestlabels = @{}
-$sourcedestrequired = @{}
-$sourcedestStripHTML = @{}
-$sourceDestDataType = @{}
-$addressMapsByDest    = @{} 
-$ListSelectEquivilencyMaps = @{}
+$sourcedestlabels       = @{};        $sourcedestrequired      = @{};
+$sourcedestStripHTML    = @{};     $sourceDestDataType         = @{};
+$addressMapsByDest      = @{};    $ListSelectEquivilencyMaps   = @{};
+
 foreach ($entry in $mapping) {
     if ($entry.dest_type -eq 'ListSelect' -and -not ([string]::IsNullOrWhiteSpace($entry.from))) {
         $parsedMap = @{}
@@ -980,46 +1161,27 @@ foreach ($entry in $mapping) {
     $sourcedestStripHTML[$entry.from] = [bool]$(@('t','true','y','yes') -contains "$($entry.striphtml ?? "False")".ToLower())
     write-host "mapping $($entry.from) to $($entry.to) $(if ($true -eq $sourcedestStripHTML[$entry.from]) {"destination field of $($entry.to) will have HTML stripped."} else {'as-is'})"
     $sourcedestlabels[$entry.from] = $entry.to
-    $sourcedestrequired[$entry.from] = $($entry.to ?? $false)
+    $sourcedestrequired[$entry.from] = $((Get-CastIfBoolean ($entry.required ?? $false) -allowFuzzy $false) ?? $false)
     $sourceDestDataType[$entry.from] = $($entry.dest_type ?? 'Text')
-
 }
 
-read-host "$($($addressMapsByDest.GetEnumerator()).count) Location Types in Target press enter to proceed"
-
-
-
+$mappingtosmooshed = [bool]$($SMOOSHLABELS.count -gt 0)
 $sourceassets = $($allAssets | Where-Object {$_.asset_layout_id -eq $sourceassetlayout.id}) 
 $destassets = $($allAssets | Where-Object {$_.asset_layout_id -eq $destassetlayout.id}) 
 if ($sourceassets.count -lt 1) { write-host "NO SOURCE ASSETS!"; exit}
-$mappingtosmooshed = [bool]$($SMOOSHLABELS.count -gt 0)
-if ($mappingtosmooshed) {
-    $smooshmappingto = ($mapping | Where-Object { $_.from -eq 'SMOOSH' }).to
-    write-host "Smooshing $SMOOSHLABELS => $mappingtosmooshed; $smooshmappingto"
-}
+read-host "$($($addressMapsByDest.GetEnumerator()).count) Location Types in Target press enter to proceed"
+
+
+$totalcounts = @{fromablescreated=0; toablescreated=0; assetsarchived=0; assetsmoved=0;
+                 assetsskipped=0; assetsmatched=0; errored=0; sourceassetcount=$sourceassets.count;}
+
+# write-out user-defined infos before start
+if ($mappingtosmooshed) {write-host "Smooshing $SMOOSHLABELS => $mappingtosmooshed; $(($mapping | Where-Object { $_.from -eq 'SMOOSH' }).to)"}
 if ($CONSTANTS) {
-    foreach ($c in $CONSTANTS){
-        write-host "Dest Labels containing $($c.to_label) will be given static value from literal $($c.literal) as literal value!"
-    }
+    foreach ($c in $CONSTANTS){write-host "Dest Labels containing $($c.to_label) will be given static value from literal $($c.literal) as literal value!"}
 } else {write-host "No constants mapped"}
-
-if ($ListSelectEquivilencyMaps.Keys.count -gt 0){
-    Write-host "$($ListSelectEquivilencyMaps.Keys.count) listselect target items mapped for $($ListSelectEquivilencyMaps.Keys -join ",")"
-}
-
-$totalcounts = @{
-    fromablescreated=0
-    toablescreated=0
-    assetsarchived=0
-    assetsmoved=0
-    assetsskipped=0
-    assetsmatched=0
-    errored=0
-    sourceassetcount=$sourceassets.count
-}
-
+if ($ListSelectEquivilencyMaps.Keys.count -gt 0){Write-host "$($ListSelectEquivilencyMaps.Keys.count) listselect target items mapped for $($ListSelectEquivilencyMaps.Keys -join ",")"}
 Write-Host "Smooshing $(if ($excludeHTMLinSMOOSH -and $true -eq $excludeHTMLinSMOOSH) {'using plaintext value-joining'} else {'using traditional HTML value joining'})"
-
 read-host "$($sourceassets.count) source assets and $($destassets.count) dest assets. press enter to proceed"
 
 
@@ -1055,13 +1217,14 @@ foreach ($originalasset in $sourceassets) {
     foreach ($field in $originalasset.fields) {
         # acquire destination information
         $transformedlabel = $sourcedestlabels[$field.label] ?? $null
-        $destTranslationFieldRequired = $("$($sourcedestrequired[$field.label])".ToLower() -eq 'true') ?? $false
+        $destTranslationFieldRequired = $(Get-CastIfBoolean $($sourcedestrequired[$field.label] ?? $false)) ?? $false
         $stripHTML = $($sourcedestStripHTML["$($field.label)"] ?? $false)
         $destFieldType = $sourceDestDataType["$($field.label)"] ?? 'Text'
 
-        if (-not $transformedlabel -or $null -eq $transformedlabel) {continue}
-        if (-not $field.value -or $null -eq $field.value) {
-                write-host "no translate for $($field.label)";
+        # checking basic validity
+        if (-not $transformedlabel -or $null -eq $transformedlabel) {write-host "no destination mapping for source field $($field.label)"; continue;}
+        if (-not $field.value -or $null -eq $field.value -or ([string]::IsNullOrWhiteSpace($field.value))) {
+                write-host "no source value for $($field.label)";
                 if ($true -eq $destTranslationFieldRequired) {
                     write-host "no value for REQUIRED $($field.label) => $transformedlabel"
                     $field.value = $($(read-host "target field $($field.label) => $transformedlabel is required but null, enter value") ?? "None")
@@ -1069,20 +1232,41 @@ foreach ($originalasset in $sourceassets) {
                     write-host "no value for optional $($field.label) => $transformedlabel"
                     continue
                 }
+        # pre-process listselect source values as huyman-readable
+        } elseif ($field.value -ilike '*list_id*'){
+            $precastValue=$field.value; $field.value = $(Get-SourceListItemNameFieldFromID $field.value -FieldLabel $field.label) ?? $null;
+            Write-Host "non-empty source val appears to contain listIDs; Raw val '$($precastValue)' as $destFieldType... $($field.value)"
         }
-        # handle listselect/dropdown mappings if present
+
+        # handle listselect item-level mappings if present
         if ($ListSelectEquivilencyMaps.Keys -contains $transformedlabel) {
             $valueEquivilencies = $ListSelectEquivilencyMaps[$transformedlabel]
             $mapping            = $valueEquivilencies.Mapping
         } else {
             $valueEquivilencies = $null
         }
-
         if (-not $valueEquivilencies -or -not $mapping) {
-            write-host "No list mapping for $($field.label) => $transformedlabel, continuing normal mapping"
+        # destination field-type validation and post-processing
+            write-host "No list mapping for $($field.label) => $transformedlabel, continuing onto destination-specific ($destFieldType) validation and casting."
+            if ($true -eq $stripHTML) {
+                $field.value="$(Remove-HtmlTags -InputString "$($field.value)")"
+            }
+            # if ($destFieldType -eq "Email" -or ($($destFieldType -eq "Text" -and $transformedlabel -like "*Email*"))){
+            #     $field.value="$(Get-CleansedEmailAddresses -InputString "$($field.value)")".Trim()
+            # }
+            if ($destFieldType -eq "Number"){
+                $precastValue=$field.value; $field.value = $(Get-CastIfNumeric $field.value) ?? $(Get-CastIfNumeric $($field.value -replace '\D+', ''));
+                Write-Host "non-empty source val on Number target; Casting '$($precastValue)' as int...$($field.value)"
+            } elseif ($destFieldType -eq "CheckBox"){
+                $precastValue=$field.value; $field.value = $(Get-CastIfBoolean $field.value -allowFuzzy $true) ?? $null
+                Write-Host "non-empty source val on CheckBox/Boolean target; Casting '$($precastValue)' as bool...$($field.value)"
+            } elseif ($destFieldType -eq "Date"){
+                $precastValue=$field.value; $field.value = $(Get-CoercedDate -InputDate "$($field.value)" -OutputFormat 'MM/DD/YYYY') ?? $null;
+                Write-Host "non-empty source val on Date target; Casting '$($precastValue)' as date...$($field.value)"
+            }
+            $transformedFields += @{$transformedlabel = $field.value}
         } else {
-
-
+        # mapping for individual listitems
             $result = Set-MappedListSelectItemFromuserMapping `
                 -Mapping $mapping `
                 -RawValue $field.value `
@@ -1092,29 +1276,22 @@ foreach ($originalasset in $sourceassets) {
             if ($result.MatchFound) {
                 Write-Host "$transformedlabel value '$($field.value)' mapped to listselect item '$($result.Key)'"
                 $transformedFields += @{ $transformedlabel = $result.Key }
-
-            } elseif ($valueEquivilencies.add_listitems -eq $true -or $valueEquivilencies.add_listitems -ilike '*t*') {
-
+            } elseif (Get-CastIfBoolean $valueEquivilencies.add_listitems) {
                 Write-Host "'$($field.value)' not found in list item matches, adding to list items for list id $($valueEquivilencies.list_id)"
                 $NewOptions = @($valueEquivilencies.list_options) + @("$($field.value)")
                 Set-HuduList -Id $valueEquivilencies.list_id -ListItems $NewOptions
                 $transformedFields += @{ $transformedlabel = $field.value }
-
-            } else {
-                Write-Host "No value matches for list id $($valueEquivilencies.list_id) from '$($field.value)' / '$($result.Normalized)'; not configured to add list items, so leaving empty."
-            }
-            continue
+            } else {Write-Host "No value matches for list id $($valueEquivilencies.list_id) from '$($field.value)' / '$($result.Normalized)'; not configured to add list items, so leaving empty."}
         }
         
-        if ($true -eq $stripHTML) {
-            $field.value="$(Remove-HtmlTags -InputString "$($field.value)")"
+        if ($destFieldType -ilike "Password"){
+            write-host "$($field.label) => *** [masked password] for value"
+        } else {
+            write-host "$($field.label) => $transformedlabel for value $($field.value)"
         }
-        if ($destFieldType -eq "Email" -or ($($destFieldType -eq "Text" -and $transformedlabel -like "*Email*"))){
-            $field.value="$(Get-CleansedEmailAddresses -InputString "$($field.value)")".Trim()
-        }
-        $transformedFields += @{$transformedlabel = $field.value}
-        write-host "$($field.label) => $transformedlabel for value $($field.value)"
     }
+
+    # seperate section for meta-mapping address source fields to addressdata target
     foreach ($kv in $addressMapsByDest.GetEnumerator()) {
         $destLabel = $kv.Key
         $addrMap   = $kv.Value
@@ -1169,20 +1346,22 @@ foreach ($originalasset in $sourceassets) {
         $newAssetRequest["Fields"]=$transformedFields
         write-host $($($transformedFields | convertto-json -depth 5).ToString())
      }
+    $propPairs = @(
+        @{ Dest = 'PrimarySerial';       Source = 'primary_serial' }
+        @{ Dest = 'PrimaryMail';         Source = 'primary_mail' }
+        @{ Dest = 'PrimaryModel';        Source = 'primary_model' }
+        @{ Dest = 'PrimaryManufacturer'; Source = 'primary_manufacturer' }
+    )
 
-     if ($originalAsset.primary_serial){
-                $newAssetRequest["PrimarySerial"]=$originalAsset.primary_serial
-     }
-     if ($originalAsset.primary_mail){
-                $newAssetRequest["PrimaryMail"]=$originalAsset.primary_mail
-     }
-     if ($originalAsset.primary_model){
-                $newAssetRequest["PrimaryModel"]=$originalAsset.primary_model
-     }
-     if ($originalAsset.primary_manufacturer){
-                $newAssetRequest["PrimaryManufacturer"]=$originalAsset.primary_manufacturer
-     }
-
+    foreach ($pairing in $propPairs) {
+        $commonPropValue = $originalAsset.($pairing.Source)
+        if (-not [string]::IsNullOrEmpty("$commonPropValue")) {
+            Write-Host "using value $commonPropValue from source $($pairing.source)->$($pairing.dest)"
+            $newAssetRequest[$pairing.Dest] = $commonPropValue
+        } else {
+            Write-Host "skipping empty value for common-property, $($pairing.source)"             
+        }
+    }
     try {
         write-host "$($($newAssetRequest | ConvertTo-Json -depth 66).ToString())"
         $newAsset = $(new-huduasset @newAssetRequest).asset
