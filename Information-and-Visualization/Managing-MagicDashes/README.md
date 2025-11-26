@@ -1,21 +1,5 @@
 # Hudu Magic Dash Manager
 
-**Professional Magic Dash Tile Management Tool for Hudu Instances**
-
----
-
-## Table of Contents
-
-- [Overview](#overview)
-- [Prerequisites](#prerequisites)
-- [Installation & Setup](#installation--setup)
-- [Configuration](#configuration)
-- [Usage Guide](#usage-guide)
-- [Features](#features)
-- [Troubleshooting](#troubleshooting)
-- [FAQ](#faq)
-- [Support](#support)
-
 ---
 
 ## Overview
