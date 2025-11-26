@@ -18,6 +18,7 @@ Collection of Hudu Community Scripts for customers to use/run/remix.
   - [Mapbox Locations Maps](./Information-and-Visualization/Mapbox-Loctions-Maps/README.md)
   - [Network Maps Articles](./Information-and-Visualization/Network-Maps-Articles/README.md)
   - [Integrations Tracking](./Information-and-Visualization/Integrations-Tracking/README.md)
+  - [Managing Magic Dashes](./Information-and-Visualization/Managing-MagicDashes/README.md)
 
 
 - **Migrations**
