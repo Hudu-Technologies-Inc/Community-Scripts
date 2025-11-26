@@ -1,5 +1,5 @@
 # Community-Scripts
-Collection of Hudu Community Scripts for customers to use/run/remix. 
+Collection of Hudu Community Scripts for anyone to use/run/remix/reference. 
 
 ---
 
@@ -33,3 +33,22 @@ Collection of Hudu Community Scripts for customers to use/run/remix.
   - [Hudu → Microsoft Fabric Sync](https://github.com/Hudu-Technologies-Inc/Hudu-Microsoft-Fabric-Sync/blob/main/README.md)
   - [Hudu → Splunk Sync](./Syncing-and-SIEM/Splunk-Sync/)
 
+
+---
+
+## Contributing
+
+We welcome community contributions in multiple ways:
+
+- **Meta-repo contributions** (this repository):  
+  Add new categories, register new submodules, or improve documentation by opening a pull request here.
+
+- **Project-specific contributions:**  
+  Each script or tool lives in its own repository as a **git submodule**. Bug fixes and feature requests should be submitted directly to the appropriate submodule repository.
+
+- **Community-driven contributions (no Git required):**  
+  Share scripts, ideas, questions, and feedback on the Hudu Community site:  
+  👉 https://community.hudu.com
+
+For full contribution guidelines, please see:  
+**[CONTRIBUTING.md](./CONTRIBUTING.md)**
