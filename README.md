@@ -10,7 +10,7 @@ Collection of Hudu Community Scripts for customers to use/run/remix.
 
 - **Client Libraries**
   - PowerShell
-    - [HuduAPI](https://github.com/Hudu-Technologies-Inc/HuduAPI/)
+    - [HuduAPI](./Client-Libraries/PowerShell/HuuduAPI/)
     - [Articles-From-Anything](./Client-Libraries/Articles-From-Anything/)
 
 - **Information and Visualization**
@@ -22,14 +22,14 @@ Collection of Hudu Community Scripts for customers to use/run/remix.
 
 
 - **Migrations**
-  - [ITGlue → Hudu Migration](https://github.com/Hudu-Technologies-Inc/ITGlue-Hudu-Migration/)
-  - [Files → Hudu Migration](https://github.com/Hudu-Technologies-Inc/Files-Hudu-Migration/)
-  - [Confluence → Hudu Migration](https://github.com/Hudu-Technologies-Inc/Confluence-Hudu-Migration/)
-  - [PassPortal → Hudu Migration](https://github.com/Hudu-Technologies-Inc/Hudu-PassPortal-Migration/)
-  - [SharePoint → Hudu Migration](https://github.com/Hudu-Technologies-Inc/SharePoint-Hudu-Migrator/)
+  - [ITGlue → Hudu Migration](./Migrations/ITGlue-Hudu-Migration/)
+  - [Files → Hudu Migration](./Migrations/Files-Hudu-Migration/)
+  - [Confluence → Hudu Migration](./Migrations/Confluence-Hudu-Migration/)
+  - [PassPortal → Hudu Migration](./Migrations/PassPortal-Hudu-Migration/)
+  - [SharePoint → Hudu Migration](./Migrations/SharePoint-Hudu-Migration/)
   - [Migrating Assets Between Layouts](./Migrations/Migrating-Assets-Between-Layouts/)
 
 - **Syncing and SIEM**
-  - [Hudu → Microsoft Fabric Sync](https://github.com/Hudu-Technologies-Inc/Hudu-Microsoft-Fabric-Sync/)
+  - [Hudu → Microsoft Fabric Sync](./Syncing-and-SIEM/Hudu-Microsoft-Fabric-Sync/)
   - [Hudu → Splunk Sync](./Syncing-and-SIEM/Splunk-Sync/)
 
