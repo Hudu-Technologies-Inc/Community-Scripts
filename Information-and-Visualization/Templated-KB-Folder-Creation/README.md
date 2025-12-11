@@ -92,6 +92,7 @@ Click **Create**.
 ## 4. Use the Script (Clean Version)
 
 Select either options 1 or 2 after company listings.
+
 <img width="380" height="106" alt="image" src="https://github.com/user-attachments/assets/179ed535-7e9e-4758-b9ed-ee60e448201e" />
 
 Option 1 will apply your folder creation to all companies.
@@ -142,6 +143,7 @@ testing 9 (root)
 When done follow confirmation messages, and accept the creation.
 
 The script will then create the folders, and silently remove any credentials used(API, Domain, Azure Secrets, etc).
+
 
 
 
