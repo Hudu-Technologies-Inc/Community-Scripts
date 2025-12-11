@@ -1,10 +1,10 @@
 Azure Key Vault — Simple Setup & Usage Guide for Hudu API Scripts
 
-This guide shows ONLY what you actually need:
-• How to create the Key Vault
-• How to create the two secrets
-• How to use them in your script
-• A minimal working example
+**This guide shows ONLY what you actually need:
+**- How to create the Key Vault
+- How to create the two secrets
+- How to use them in your script
+- A minimal working example
 
 ============================================================
 
@@ -19,21 +19,21 @@ Search for Key Vaults → click Create.
 Step 2 — Required fields
 
 Project details:
-• Subscription: your subscription
-• Resource group: choose or create one
+- Subscription: your subscription
+- Resource group: choose or create one
 
 Instance details:
-• Key Vault name: must be unique (example: Hudu-Automation-Vault)
-• Region: pick your region
-• Pricing tier: Standard
+- Key Vault name: must be unique (example: Hudu-Automation-Vault)
+- Region: pick your region
+- Pricing tier: Standard
 
 Access Configuration:
-• Permission model: Role-based access control (RBAC)
+- Permission model: Role-based access control (RBAC)
 (Required for PowerShell scripts)
 
 Networking:
-• Public access: Enabled
-• Allow all networks (for now)
+- Public access: Enabled
+- Allow all networks (for now)
 
 Click Review + Create → Create.
 
@@ -45,9 +45,9 @@ Click Add → Add role assignment
 
 
 Select role:
-• Key Vault Secrets User (read secrets only, recommended)
+- Key Vault Secrets User (read secrets only, recommended)
 OR
-• Key Vault Administrator (full access — only for setup)
+- Key Vault Administrator (full access — only for setup)
 
 Add your Azure user
 
@@ -61,26 +61,24 @@ You now have permission to read secrets from PowerShell.
 Inside your Key Vault → Secrets → Generate/Import.
 
 Secret #1 — Hudu API Key
-• Name: HuduAPIKey
-• Value: paste the API key from Hudu
+- Name: HuduAPIKey
+- Value: paste the API key from Hudu
 Path in Hudu: Admin → API Keys
 
-Click Create.
+Click **Create**.
 
 
 Secret #2 — HuduBaseURL
-• Name: HuduBaseURL
-• Value example:
+- Name: HuduBaseURL
+- Value example:
 https://docs.yourcompany.com
-
 
 OR:
 docs.yourcompany.com
 
+(Both work — the script normalizes it.)
 
-(Both work — script normalizes it.)
-
-Click Create.
+Click **Create**.
 
 ============================================================
 
@@ -132,4 +130,5 @@ testing 9 (root)
 When done follow confirmation messages, and accept the creation.
 
 The script will then create the folders, and silently remove any credentials used(API, Domain, Azure Secrets, etc).
+
 
