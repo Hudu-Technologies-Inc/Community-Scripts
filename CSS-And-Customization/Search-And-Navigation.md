@@ -12,6 +12,7 @@ To explicitly place your search bar on the far-left or far-right of your top nav
 #### right-aligned search
 
 <img width="1007" height="47" alt="image" src="https://github.com/user-attachments/assets/c6a5b067-c974-4745-a01c-b3455170624b" />
+
 ```CSS
 .header__search { order: 999; }
 ```
