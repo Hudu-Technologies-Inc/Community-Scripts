@@ -4,7 +4,7 @@
 To explicitly place your search bar on the far-left or far-right of your top navigation bar, here's a good starting point.
 
 #### left-aligned search
-<img width="1002" height="43" alt="image" src="https://github.com/user-attachments/assets/f9b4433f-09b5-4332-bdb1-c7072aa7fc28" />
+<img width="1005" height="48" alt="image" src="https://github.com/user-attachments/assets/cd35fe91-2246-48a9-b9dc-40f361566ceb" />
 
 ```CSS
 .header__search { order: -1; }
