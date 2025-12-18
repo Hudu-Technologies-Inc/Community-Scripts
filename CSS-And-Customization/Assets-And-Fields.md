@@ -104,3 +104,35 @@ Values-
 box-shadow: inset 0 0 0 1px rgba(255,255,255,0.03);
 }
 ```
+
+## Hiding Last-Created / Last-Updated columns in Assets
+
+```css
+/* Last tested against Hudu V2.37.0 - See below, it puts borders or hides them. Hover mouse over "learn" icon to see the dates again in old Hudu, click profile image for menu displayed for new Hudu. Requires nested CSS support and shows greenyellow top border when hiding columns as a hint to users*/
+ 
+/* Applies only to a certain user number (1) and highlights the boxes it will be hiding and tables it is "interested in." User is here in the code: `/uploads/user/1/` or change it to `/uploads/user/` for all users */
+ 
+/* Comment out the 2x lines `display: none !important;` to set audit mode (border colour only) */
+ 
+ 
+ 
+ 
+/* Excludes all admin area tables, as well as 1 custom asset layout (Change Requests) you may wish to do something similar */
+ 
+ 
+body:not(* .header .header__a--learn:hover):has(* .header .dropdown__content.hidden a[href="/user/settings"]):has(* .header__content a.profile[data-tippy-content="My account"] img[src*="/uploads/user/"]) {
+&:not(:has(.toolbar>.breadcrumb ul>li:first-child>a[href="/2admin"])) .table-wrapper:not(:has(form[action*="/change-requests-4ef6b6ebc581?"])) .table-scroll>table:has(>thead>tr>th~th[data-column-resizable="created_at"]+th:last-of-type[data-column-resizable="updated_at"]) {
+    border-top: 5px solid greenyellow;
+}
+&:not(:has(.toolbar>.breadcrumb ul>li:first-child>a[href="/2admin"])) .table-wrapper .table-scroll>table:has(>thead>tr>th~th[data-column-resizable="created_at"]+th:last-of-type[data-column-resizable="updated_at"]) {
+    &>thead>tr>th:nth-last-child(-n+2) {
+        border: 2px solid red;
+        display: none !important;
+    }
+    &>tbody>tr>td:nth-last-child(-n+2) {
+        border: 2px solid blue;
+        display: none !important;
+    }
+}
+}
+```
