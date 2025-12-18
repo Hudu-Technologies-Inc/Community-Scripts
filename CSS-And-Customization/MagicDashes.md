@@ -67,38 +67,47 @@ There are a number of properties that can be selected for when styling with CSS.
 
 Target cards based on **icons or content**, which act as semantic signals.
 
-core card:
+#### core card:
+
 `.custom-fast-fact { }`
 
-Info icon:
+#### Info icon:
+
 `.custom-fast-fact:has(.fa-info-circle) { }`
 
-Warning / alert icon:
+#### Warning / alert icon:
+
 `.custom-fast-fact:has(.fa-exclamation-triangle) { }`
 
-Cards with empty content:
+#### Cards with empty content:
+
 `.custom-fast-fact:has(.custom-fast-fact__content:empty) { }`
 
-Cards with populated content:
+#### Cards with populated content:
+
 `.custom-fast-fact:has(.custom-fast-fact__content p) { }`
 
-with info-circle icon / icon logic-
+#### with info-circle icon / icon logic-
+
 `.custom-fast-fact:has(.fa-info-circle) { }`
 
-Cards with content-
+#### Cards with content-
+
 `.custom-fast-fact:has(.custom-fast-fact__content p) { }`
 
-Odd/Even:
+#### Odd/Even:
+
 `.custom-fast-fact:nth-child(odd) { }`
 `.custom-fast-fact:nth-child(even) { }`
 
-Header/Content:
+#### Header/Content:
 
 `.custom-fast-fact__header { }`
 
 `.custom-fast-fact__content { }`
 
-## De-emphasize empty cards
+## Example - De-emphasize empty cards
+
 ```css
 .custom-fast-fact--null {
   opacity: 0.5;
