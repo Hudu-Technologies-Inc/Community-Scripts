@@ -3,6 +3,9 @@ Collection of Hudu Community Scripts for anyone to use/run/remix/reference.
 
 ---
 
+- **CSS and Customization**
+  - [CSS and Customization Index](CSS-And-Customization/)
+  
 - **Administration**
   - [Doubletake Postgres Backups](Administration/DoubleTake-Backups/)
   - [Dropdown to ListSelect](Administration/Dropdown-To-ListSelect/)
