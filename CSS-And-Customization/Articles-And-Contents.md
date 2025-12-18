@@ -30,6 +30,37 @@ background: rgba(255,255,255,0.03);
 ```
 ---
 
+## Creating a Standard Styling for Tables in Articles
+
+If you want to style all your article tables at once, it's easier than it sounds. Whether for branding or visibiltiy, it's rather easy-
+
+<img width="1432" height="734" alt="image" src="https://github.com/user-attachments/assets/e3e053b2-b67a-4835-8100-3fdf38043ecf" />
+
+```css
+/* Tables inside rich text */
+.rich_text_content table {
+width: 100%;
+border-collapse: collapse;
+border: 2px solid rgba(255,255,255,0.6);   /* outer border */
+margin: 12px 0;
+}
+/* Cell borders */
+.rich_text_content th,
+.rich_text_content td {
+padding: 10px 12px;
+border: 1.5px solid rgba(255,255,255,0.45);
+vertical-align: top;
+}
+.rich_text_content th {
+background: rgba(222, 222, 15, 0.45);
+color: #ffffff;
+font-weight: 700;
+text-align: left;
+}
+```
+
+---
+
 ## Creating a Reusable Class for Collapsable Tables in Articles
 <img width="1592" height="496" alt="image" src="https://github.com/user-attachments/assets/10f98931-33e9-4ce2-8b08-683e474592cf" />
 
@@ -99,3 +130,4 @@ And to designate this class to a table in an Article, you can simply go to 'sour
 
 This example is better-used for finalized documents that aren't often edited, because it may make editing a little tricky, but could be handy for articles with many tables.
 ---
+
