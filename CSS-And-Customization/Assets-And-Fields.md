@@ -1,5 +1,18 @@
 # Assets and Fields
 
+## Styling / Emphasizing Fields
+
+<img width="800" height="362" alt="image" src="https://github.com/user-attachments/assets/0839b7da-1364-426f-a1aa-1e2112676453" />
+
+```css
+/* Make the main header/title stand out */
+#app .cpanel-name__main h1 a span {
+font-size: 1.6em !important;
+font-weight: 800 !important;
+letter-spacing: 0.2px;
+}
+```
+
 ## Highlighting Filled ListSelect Values
 
 While we can't highlight content based on the content itself, we can highlight values based on their inherited properties. In this case, we're targeting properties that status fields or listselect fields posess.
