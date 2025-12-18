@@ -8,3 +8,5 @@
   - [MagicDashes](MagicDashes.md)
   - [Assets and Fields](Assets-And-Fields.md)
   - [Search and Navigation](Search-And-Navigation.md)
+  - [Companies and Logos](Companies-And-Logos.md)
+  - [FontAwesome Icons](FA-Icon-Information.md)
