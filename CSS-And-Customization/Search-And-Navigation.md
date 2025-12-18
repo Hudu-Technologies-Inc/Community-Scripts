@@ -17,6 +17,14 @@ To explicitly place your search bar on the far-left or far-right of your top nav
 .header__search { order: 999; }
 ```
 
+## Make the font color of the top nav menu items white, no matter what mode or theme:
+
+```CSS
+.dark-portal a:not(.button).header__a.active, .dark-portal a:not(.button).header__a {
+    color: white;
+}
+```
+
 ## Generally-Customizing Fonts, Style, Justification, and More
 Below are a few examples that can be a great starting point or reference for Hudu users that want to granularly customize Hudu's core navbar or search box
 <img width="996" height="46" alt="image" src="https://github.com/user-attachments/assets/5f2d191c-7b69-4096-91bd-86474ed36aa7" />
