@@ -1,4 +1,16 @@
 # Customizing Articles and Article Contents
+
+## Enlarging Images on Hover
+
+This can be handy for quickly expanding images for a brief detailed-view in articles and is very simple.
+
+```CSS
+.hemingway__split-content img:hover {
+ width: 1000px;
+ border: 5px solid rgba(0, 0, 0, .5);
+}
+```
+
 ## Emphasizing/Styling Article Contents
 
 In this example, you can see that the article contents has been placed into a somewhat-subtle card, which can help make the information therein 'pop'
@@ -130,4 +142,5 @@ And to designate this class to a table in an Article, you can simply go to 'sour
 
 This example is better-used for finalized documents that aren't often edited, because it may make editing a little tricky, but could be handy for articles with many tables.
 ---
+
 
