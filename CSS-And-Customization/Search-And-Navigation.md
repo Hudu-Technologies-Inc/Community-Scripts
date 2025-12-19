@@ -60,3 +60,20 @@ Below are a few examples that can be a great starting point or reference for Hud
     transition: all 0.6s;
 }
 ```
+
+## Styling Buttons
+You can easily style the primary button with something like this:
+
+<img width="384" height="150" alt="image" src="https://github.com/user-attachments/assets/b4d56434-272f-431d-90e3-f1878ebffe48" />
+<img width="832" height="392" alt="image" src="https://github.com/user-attachments/assets/a47354b9-d6de-4b07-b4d4-429e1bdd0a69" />
+
+```CSS
+.button--primary {
+  border: 1px red solid !important;
+  background-color: red !important;
+  background: red !important;
+  color: white;
+}
+```
+
+
