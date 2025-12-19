@@ -25,3 +25,6 @@
 [submodule "Migrations/Files-Hudu-Migration"]
 	path = Migrations/Files-Hudu-Migration
 	url = https://github.com/Hudu-Technologies-Inc/Files-Hudu-Migration.git
+[submodule "Migrations/ITBoost-Hudu-Migration"]
+	path = Migrations/ITBoost-Hudu-Migration
+	url = https://github.com/Hudu-Technologies-Inc/ITBoost-Hudu-Migration.git

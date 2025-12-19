@@ -27,14 +27,15 @@ Collection of Hudu Community Scripts for anyone to use/run/remix/reference.
 
 - **Migrations**
   - [ITGlue → Hudu Migration](https://github.com/Hudu-Technologies-Inc/ITGlue-Hudu-Migration/blob/main/README.md)
-  - [Files → Hudu Migration](https://github.com/Hudu-Technologies-Inc/Files-Hudu-Migration/blob/main/README.md)
-  - [Confluence → Hudu Migration](https://github.com/Hudu-Technologies-Inc/Confluence-Hudu-Migration/blob/main/README.md)
-  - [PassPortal → Hudu Migration](https://github.com/Hudu-Technologies-Inc/Hudu-PassPortal-Migration/blob/main/README.md)
-  - [SharePoint → Hudu Migration](https://github.com/Hudu-Technologies-Inc/SharePoint-Hudu-Migrator/blob/main/README.md)
+  - [ITBoost → Hudu Migration](https://github.com/Hudu-Technologies-Inc/ITBoost-Hudu-Migration)
+  - [Files → Hudu Migration](https://github.com/Hudu-Technologies-Inc/Files-Hudu-Migration)
+  - [Confluence → Hudu Migration](https://github.com/Hudu-Technologies-Inc/Confluence-Hudu-Migration/blob)
+  - [PassPortal → Hudu Migration](https://github.com/Hudu-Technologies-Inc/Hudu-PassPortal-Migration)
+  - [SharePoint → Hudu Migration](https://github.com/Hudu-Technologies-Inc/SharePoint-Hudu-Migrator)
   - [Migrating Assets Between Layouts](Migrations/Migrating-Assets-Between-Layouts/)
 
 - **Syncing and SIEM**
-  - [Hudu → Microsoft Fabric Sync](https://github.com/Hudu-Technologies-Inc/Hudu-Microsoft-Fabric-Sync/blob/main/README.md)
+  - [Hudu → Microsoft Fabric Sync](https://github.com/Hudu-Technologies-Inc/Hudu-Microsoft-Fabric-Sync)
   - [Hudu → Splunk Sync](./Syncing-and-SIEM/Splunk-Sync/)
 
 
