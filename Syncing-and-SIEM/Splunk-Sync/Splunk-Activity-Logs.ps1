@@ -114,6 +114,23 @@ $observable_actions = @(
     "unarchived"
 )
 
+function Get-PSVersionCompatible {
+    param (
+        [version]$RequiredPSversion = [version]"7.5.1"
+    )
+
+    $currentPSVersion = (Get-Host).Version
+    Write-Host "Required PowerShell version: $RequiredPSversion" -ForegroundColor Blue
+
+    if ($currentPSVersion -lt $RequiredPSversion) {
+        Write-Host "PowerShell $RequiredPSversion or higher is required. You have $currentPSVersion." -ForegroundColor Red
+        exit 1
+    } else {
+        Write-Host "PowerShell version $currentPSVersion is compatible." -ForegroundColor Green
+    }
+}
+Get-PSVersionCompatible
+
 # Initialize Modules
 Write-Host "Installing and/or Importing Modules, signing into Hudu with API key from Key Vault"
 foreach ($module in @('Az.KeyVault', 'HuduAPI')) {if (Get-Module -ListAvailable -Name $module) 
