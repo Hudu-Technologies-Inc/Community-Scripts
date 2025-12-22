@@ -437,12 +437,91 @@ function Get-SmooshedLinkableDescription {
 $summary
 "@
             }
-            $description += $descriptor
+        $description = "$description<br><hr>$descriptor"
         }
     }
 
     return $description
 }
+
+function Ensure-HuduListItemByName {
+    param(
+        [Parameter(Mandatory)][int]$ListId,
+        [Parameter(Mandatory)][string]$Name,
+        [hashtable]$listNameExistsByListId
+    )
+
+    $nameTrim = $Name.Trim()
+    $needle = $nameTrim.ToLowerInvariant()
+
+    if (-not $listNameExistsByListId.ContainsKey($ListId)) {
+        Refresh-ListCache
+    }
+
+    $map = $listNameExistsByListId[$ListId]
+    if ($map -and $map.ContainsKey($needle)) {
+        return $map[$needle]  # return canonical name as stored
+    }
+
+    # Add item to list
+    $list = Get-HuduLists -Id $ListId
+    $listName = $list.name
+
+    $items = @()
+    foreach ($existing in ($list.list_items ?? @())) {
+        $items += @{ id = [int]$existing.id; name = [string]$existing.name }
+    }
+    $items += @{ name = $nameTrim }
+
+    $null = Set-HuduList -Id $ListId -Name $listName -ListItems $items
+
+    # refresh cache and return
+    $listNameExistsByListId = Refresh-ListCache
+    $map = $listNameExistsByListId[$ListId]
+    if ($map.ContainsKey($needle)) { return $map[$needle] }
+
+    throw "Failed to add/list item '$Name' to list $ListId"
+}
+function Refresh-ListCache {
+    $listNameExistsByListId = @{}
+    foreach ($l in Get-HuduLists) {
+        $lid = [int]$l.id
+        $map = @{}
+        foreach ($it in ($l.list_items ?? @())) {
+            if ($it.name) {
+                $map[$it.name.ToString().Trim().ToLowerInvariant()] = [string]$it.name
+            }
+        }
+        $listNameExistsByListId[$lid] = $map
+    }
+    return $listNameExistsByListId
+}
+
+function SafeDecode {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory)]
+        [AllowNull()]
+        [object]$InputObject
+    )
+
+    if ($null -eq $InputObject) { return $null }
+
+    if ($InputObject -isnot [string]) {
+        return $InputObject
+    }
+
+    $s = $InputObject.Trim()
+    if ([string]::IsNullOrWhiteSpace($s)) { return $null }
+
+    try {
+        return $s | ConvertFrom-Json -ErrorAction Stop
+    } catch {
+        # Not valid JSON; just return the original string
+        return $InputObject
+    }
+}
+
 
 function Get-HuduModule {
     param (
@@ -1234,8 +1313,12 @@ foreach ($originalasset in $sourceassets) {
                 }
         # pre-process listselect source values as huyman-readable
         } elseif ($field.value -ilike '*list_id*'){
-            $precastValue=$field.value; $field.value = $(Get-SourceListItemNameFieldFromID $field.value -FieldLabel $field.label) ?? $null;
-            Write-Host "non-empty source val appears to contain listIDs; Raw val '$($precastValue)' as $destFieldType... $($field.value)"
+            $precastValue=$field.value;
+            $listItemId = $null; 
+            $listItemId = $(SafeDecode $field.value).list_ids[0]
+            $humanValue = $($(get-hudulists).list_items | where-object {$_.id -eq $listItemId} | select-object -first 1).name
+            $field.value = $humanValue
+            Write-Host "non-empty source val appears to contain listIDs; Raw val '$($precastValue)' as $destFieldType... $($field.value)" -foregroundColor DarkCyan
         }
 
         # handle listselect item-level mappings if present
@@ -1267,6 +1350,7 @@ foreach ($originalasset in $sourceassets) {
             $transformedFields += @{$transformedlabel = $field.value}
         } else {
         # mapping for individual listitems
+            if ([string]::IsNullOrWhiteSpace($field.value)){continue}        
             $result = Set-MappedListSelectItemFromuserMapping `
                 -Mapping $mapping `
                 -RawValue $field.value `
@@ -1277,10 +1361,10 @@ foreach ($originalasset in $sourceassets) {
                 Write-Host "$transformedlabel value '$($field.value)' mapped to listselect item '$($result.Key)'"
                 $transformedFields += @{ $transformedlabel = $result.Key }
             } elseif (Get-CastIfBoolean $valueEquivilencies.add_listitems) {
-                Write-Host "'$($field.value)' not found in list item matches, adding to list items for list id $($valueEquivilencies.list_id)"
-                $NewOptions = @($valueEquivilencies.list_options) + @("$($field.value)")
-                Set-HuduList -Id $valueEquivilencies.list_id -ListItems $NewOptions
-                $transformedFields += @{ $transformedlabel = $field.value }
+                write-host "List item not in range, adding $($field.value) to list id $($valueEquivilencies.list_id)..." -ForegroundColor Yellow
+                $listCache = Refresh-ListCache
+                Ensure-HuduListItemByName -ListId $valueEquivilencies.list_id -Name "$($field.value)".Trim() -listNameExistsByListId $listCache
+                $transformedFields += @{ $transformedlabel = $("$($field.value)".Trim()) }
             } else {Write-Host "No value matches for list id $($valueEquivilencies.list_id) from '$($field.value)' / '$($result.Normalized)'; not configured to add list items, so leaving empty."}
         }
         
@@ -1450,7 +1534,7 @@ if ($newlayoutname -ne $sourceassetlayout.name -or $true -eq $setsourcelayoutarc
     Set-HuduAssetLayout -id $sourceassetlayout.id -Name $newlayoutname -Active $false
 }
 if ($true -eq $setsourceassetsarchived) {
-    foreach ($assetarch in $(Get-HuduAssets -AssetLayoutId $sourceassetlayout.id | where-object {$_.archived -ne $true})) {
+    foreach ($originalasset in $sourceassets) {
         $result=Set-HuduAssetArchive -id $assetarch.id -CompanyId $assetarch.company_id -archive $true
         $totalcounts.assetsarchived=$(if ($result) {$totalcounts.assetsarchived+1} else {$totalcounts.assetsarchived})
     }
