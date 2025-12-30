@@ -66,6 +66,23 @@ $VaultName = "hudu-pshell-learning"
 # Validate Hudu credentials and allow 3 attempts before exiting
 # This ensures the script fails gracefully with helpful error messages
 
+function Get-PSVersionCompatible {
+    param (
+        [version]$RequiredPSversion = [version]"7.5.1"
+    )
+
+    $currentPSVersion = (Get-Host).Version
+    Write-Host "Required PowerShell version: $RequiredPSversion" -ForegroundColor Blue
+
+    if ($currentPSVersion -lt $RequiredPSversion) {
+        Write-Host "PowerShell $RequiredPSversion or higher is required. You have $currentPSVersion." -ForegroundColor Red
+        exit 1
+    } else {
+        Write-Host "PowerShell version $currentPSVersion is compatible." -ForegroundColor Green
+    }
+}
+Get-PSVersionCompatible
+
 $maxAttempts = 3
 $attempt = 0
 $credentialsValid = $false
