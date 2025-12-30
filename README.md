@@ -11,7 +11,7 @@ Collection of Hudu Community Scripts for anyone to use/run/remix/reference.
   - [Dropdown to ListSelect](Administration/Dropdown-To-ListSelect/)
   - [RBAC and Access Info](Administration/RBAC-and-Access-Info/)
   - [Storage Usage and Basic Health Info](Administration/Storage-Usage-and-Basic-Health-Info/)
-  - [Listifying Text Fields (converting to listselect))](Administration/Listifying-Text-Fields/)
+  - [Listifying Text Fields (converting to listselect)](Administration/Listifying-Text-Fields/)
 
 - **Client Libraries**
   - PowerShell
