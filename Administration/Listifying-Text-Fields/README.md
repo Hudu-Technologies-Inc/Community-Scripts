@@ -21,7 +21,7 @@ The conversion process is straightforward and interactive, requiring only a sing
 
 ### 1. Select an Asset Layout
 
-You’ll first be prompted to choose the Asset Layout that contains the Text field you want to standardize.
+You’ll first be prompted to choose the Asset Layout that contains the Text field you want to standardize. Any layouts that do not contain at least one Text field are omitted.
 
 ### 2. Choose the Source Field
 
