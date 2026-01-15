@@ -28,3 +28,6 @@
 [submodule "Migrations/ITBoost-Hudu-Migration"]
 	path = Migrations/ITBoost-Hudu-Migration
 	url = https://github.com/Hudu-Technologies-Inc/ITBoost-Hudu-Migration.git
+[submodule "Migrations/Itportal-Hudu-Migration"]
+	path = Migrations/Itportal-Hudu-Migration
+	url = https://github.com/Hudu-Technologies-Inc/ITPortal-Hudu-Migration.git
