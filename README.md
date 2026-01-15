@@ -29,6 +29,7 @@ Collection of Hudu Community Scripts for anyone to use/run/remix/reference.
 - **Migrations**
   - [ITGlue → Hudu Migration](https://github.com/Hudu-Technologies-Inc/ITGlue-Hudu-Migration/blob/main/README.md)
   - [ITBoost → Hudu Migration](https://github.com/Hudu-Technologies-Inc/ITBoost-Hudu-Migration)
+  - [ITPortal → Hudu Migration](https://github.com/Hudu-Technologies-Inc/ITPortal-Hudu-Migration)
   - [Files → Hudu Migration](https://github.com/Hudu-Technologies-Inc/Files-Hudu-Migration)
   - [Confluence → Hudu Migration](https://github.com/Hudu-Technologies-Inc/Confluence-Hudu-Migration/blob)
   - [PassPortal → Hudu Migration](https://github.com/Hudu-Technologies-Inc/Hudu-PassPortal-Migration)
