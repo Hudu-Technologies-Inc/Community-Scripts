@@ -31,7 +31,7 @@ Collection of Hudu Community Scripts for anyone to use/run/remix/reference.
   - [ITBoost → Hudu Migration](https://github.com/Hudu-Technologies-Inc/ITBoost-Hudu-Migration)
   - [ITPortal → Hudu Migration](https://github.com/Hudu-Technologies-Inc/ITPortal-Hudu-Migration)
   - [Files → Hudu Migration](https://github.com/Hudu-Technologies-Inc/Files-Hudu-Migration)
-  - [Confluence → Hudu Migration](https://github.com/Hudu-Technologies-Inc/Confluence-Hudu-Migration/blob)
+  - [Confluence → Hudu Migration](https://github.com/Hudu-Technologies-Inc/Confluence-Hudu-Migration)
   - [PassPortal → Hudu Migration](https://github.com/Hudu-Technologies-Inc/Hudu-PassPortal-Migration)
   - [SharePoint → Hudu Migration](https://github.com/Hudu-Technologies-Inc/SharePoint-Hudu-Migrator)
   - [Migrating Assets Between Layouts](Migrations/Migrating-Assets-Between-Layouts/)
