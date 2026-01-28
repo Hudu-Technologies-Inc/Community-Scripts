@@ -10,6 +10,8 @@ pwsh  -NoProfile -ExecutionPolicy Bypass -Command "irm 'https://raw.githubuserco
 
 If all the prerequisites are met (updated HuduAPI module and Hudu 2.40.0 or newer), you'll get a nice green message indicating that you're ready to go-
 
+<img width="3438" height="232" alt="image" src="https://github.com/user-attachments/assets/0aa669f3-b5df-4739-9ff3-990dde3c1f01" />
+
 *Let's go through some scenarios.* **Of course, you can and are encouraged to modify these scenarios to better suit your needs-**
 
 ## Scenario 1: we want to flag all assets that havent been updated since `$flagDate`  
