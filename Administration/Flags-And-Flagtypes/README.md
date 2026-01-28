@@ -2,6 +2,39 @@
 
 ### Here are some ways you can easily add such flags and apply them to suit your organizations needs!
 
+`Flags` and `FlagTypes` can help tighten focus around items in Hudu that need special care, more attention, review or revision. Being a powerful feature set for organization and notation, it's a good capability to have a handle on as a Hudu user, administrator or power-user.
+
+### Notes on FlagTypes
+
+`FlagTypes` can be applied to a **variety of objects** in Hudu
+
+- Articles
+- Networks
+- Ip Addresses
+- VLAN Zones
+- Assets
+- Companies
+- Procedures
+- Rack Storages
+- Passwords
+
+While these are general categories that something might fit in, how you use them is up to you. 
+#### The best part? You can pick from a variety of colors to represent any of your `FlagTypes`
+
+You might have a `FlagType` named 'Needs Attention' or 'Under Review' for **quality assurance purposes** with the color Orange
+You might have a `FlagType` named 'Handle With Care' or 'Special Case' for **special cases or edge cases** with the color Pink
+You might have a `FlagType` named 'Mason' or 'Cameron' **to define ownership of article or object** with the color Green
+You might have a `FlagType` named 'Wild Child' or 'Cash on Delivery' **to define characteristics of a company** with the color Purple
+You might have a `FlagType` named 'Deprecated' or 'EOL' **to flag objects that aren't going to be in use much longer** with the color Blue
+You might have a `FlagType` named 'In-Service', 'Checked-Out' or 'Not-In-Service' **to flag objects that are in a special state** with the color Grey
+
+### Notes on Flags
+
+`Flags` represent the individual attribution of a `flagtype` to an object
+For example, if you have a `FlagType` named 'Needs Attention' or 'Under Review' for **quality assurance purposes** with the color Orange, you might apply that to 6 `passwords`, 2 `companies`, and an `asset`. This would result in 9 new Flag objects. Flag objects can be revoked or changed at any time and any single object can have one, none, or several distinct/unique `flagtypes` attributed to them.
+
+---
+
 ## Firstly, you'll need to load the prerequisite helper functions with this nifty oneliner (using pwsh7+), then you're ready to roll-
 
 ```powershell
@@ -13,6 +46,8 @@ If all the prerequisites are met (updated HuduAPI module and Hudu 2.40.0 or newe
 <img width="3438" height="232" alt="image" src="https://github.com/user-attachments/assets/0aa669f3-b5df-4739-9ff3-990dde3c1f01" />
 
 *Let's go through some scenarios.* **Of course, you can and are encouraged to modify these scenarios to better suit your needs-**
+
+---
 
 ## Scenario 1: we want to flag all assets that havent been updated since `$flagDate`  
 
@@ -32,6 +67,8 @@ $staleAssetesFlag = Select-OrCreateFlagType -description "Flag all assets not up
 $allassets | ForEach-Object {New-HuduFlag -flagTypeId $staleAssetesFlag.id -flagableType "asset" -flaggableId $_.id}
 ```
 
+---
+
 ## Scenario 2: we want to flag all articles that have less than 100 characters in Length 
 
 For this snippet, we'll want to set what we think is an **acceptable minimum length (in characters)** for `articles`. Any articles shorter than this, we will flag for review-
@@ -45,6 +82,8 @@ $shortArticles = Get-HuduArticles | Where-Object {"$($_.content)".length -lt $mi
 $shortArticlesFlag = Select-OrCreateFlagType -description "Flag all articles with less than 100 characters"
 $shortArticles | ForEach-Object {New-HuduFlag -flagTypeId $shortArticlesFlag.id -flagableType "article" -flaggableId $_.id}
 ```
+
+---
 
 ## Scenario 3: lets get a handle on these weak passwords!  
 
@@ -64,6 +103,8 @@ $weakPasswordsFlag = Select-OrCreateFlagType -description "Flag all weak passwor
 $weakPasswords | ForEach-Object {New-HuduFlag -flagTypeId $weakPasswordsFlag.id -flagableType "password" -flaggableId $_.id}
 ```
 
+---
+
 ## Scenario 4: we want to flag all procedures that have too-few tasks/steps
 
 If your organization has some procedures that might need to be evaluated, this can be a great starting point
@@ -81,6 +122,8 @@ $proceduresFlag = Select-OrCreateFlagType -description "Flag all procedures that
 $weakProcedures | ForEach-Object {New-HuduFlag -flagTypeId $proceduresFlag.id -flagableType "procedure" -flaggableId $_.id}
 ```
 
+---
+
 ## Scenario 5: we want to flag all rack storages that are underutilized (less than X% capacity)
 
 First, we'll need to define **what we consider to be underutilized (as percent utilization)**. In this example, we'll suppose ***10%*** or lower constitutes an underutilized `rack storage`, but you can change this as best suits your needs
@@ -97,6 +140,8 @@ $racksFlag = Select-OrCreateFlagType -description "Flag all rack storages that a
 $underutilizedRacks | ForEach-Object {New-HuduFlag -flagTypeId $racksFlag.id -flagableType "rack" -flaggableId $_.id}
 ```
 
+---
+
 ## Scenario 6: we want to flag external networks so that they will be recognized and **handled with care**
 
 This one is pretty straightforward and doesn't require any user-defined variables. We're just selecting for **external** `networks`. It can help to make these external `networks` easily identifiable so they may be *handled with extra care*
@@ -106,6 +151,8 @@ $externalNetworks = Get-HuduNetworks | Where-Object {[int]($_.network_type) -eq 
 $externalNetworksFlag = Select-OrCreateFlagType -description "Flag all external networks"
 $externalNetworks | ForEach-Object {New-HuduFlag -flagTypeId $externalNetworksFlag.id -flagableType "network" -flaggableId $_.id}
 ```
+
+---
 
 ## Scenario 7: lets flag all publicly shared articles **so that we don't update them with sensitive info by mistake**
 
