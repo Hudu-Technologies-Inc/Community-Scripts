@@ -12,9 +12,9 @@ If all the prerequisites are met (updated HuduAPI module and Hudu 2.40.0 or newe
 
 *Let's go through some scenarios.* **Of course, you can and are encouraged to modify these scenarios to better suit your needs-**
 
-## Scenario 1: we want to flag all assets that havent been updated since $flagDate  
+## Scenario 1: we want to flag all assets that havent been updated since `$flagDate`  
 
-first, you'll need to set your `$flagDate` variable. This can be any date that you think any given `asset` *should have been updated since*. Most date formats are valid to set here, but to keep the day and month sections from being conflated with one another, the below formats are good. We give preference to international formats here.
+first, you'll need to set your `$flagDate` variable. This can be any date that you think any given `asset` **should have been updated since**. Most date formats are valid to set here, but to keep the day and month sections from being conflated with one another, the below formats are good. We give preference to international formats here.
 
 ```powershell
 $flagDate = '26 Jan 2026 15:56'
@@ -32,7 +32,7 @@ $allassets | ForEach-Object {New-HuduFlag -flagTypeId $staleAssetesFlag.id -flag
 
 ## Scenario 2: we want to flag all articles that have less than 100 characters in Length 
 
-For this snippet, we'll want to set what we think is an *acceptable minimum length (in characters)* for `articles`. Any articles shorter than this, we will flag for review-
+For this snippet, we'll want to set what we think is an **acceptable minimum length (in characters)** for `articles`. Any articles shorter than this, we will flag for review-
 
 ```powershell
 $minimumAcceptableLength = 100
@@ -47,14 +47,14 @@ $shortArticles | ForEach-Object {New-HuduFlag -flagTypeId $shortArticlesFlag.id 
 ## Scenario 3: lets get a handle on these weak passwords!  
 
 Weak passwords should be under a magnifying glass, since they can create a major security gap.
-In this example, we'll set a variable for *minimum password length* and for *minimum characters used*.
+In this example, we'll set a variable for **minimum password length** and for **minimum unique characters used**.
 
 ```powershell
 $minimumpasswordLength=8
 $minimumCharsUsed=6
 ```
 
-Once you've defined what you think are *acceptable minimum values* for `passwords`, you can **'flag away'**
+Once you've defined what you think are **acceptable minimum values** for `passwords`, you can **'flag away'**
 
 ```powershell
 $weakPasswords = get-hudupasswords | Where-Object {"$($_.asset_password.password ?? $_.password)".length -lt $minimumpasswordLength -or ("$($_.asset_password.password ?? $_.password)".ToCharArray() | Select-Object -Unique).Count -lt $minimumCharsUsed}
@@ -65,7 +65,7 @@ $weakPasswords | ForEach-Object {New-HuduFlag -flagTypeId $weakPasswordsFlag.id 
 ## Scenario 4: we want to flag all procedures that have too-few tasks/steps
 
 If your organization has some procedures that might need to be evaluated, this can be a great starting point
-Firstly, we'll define what we think is an *acceptable minimum number* of steps or tasks a `procedure` should have
+Firstly, we'll define what we think is an **acceptable minimum number of steps or tasks** a `procedure` should have
 
 ```powershell
 $minimumAllowedSteps=2
@@ -81,7 +81,7 @@ $weakProcedures | ForEach-Object {New-HuduFlag -flagTypeId $proceduresFlag.id -f
 
 ## Scenario 5: we want to flag all rack storages that are underutilized (less than X% capacity)
 
-First, we'll need to define *what we consider to be underutilized (as percent utilization)*. In this example, we'll suppose **10%** or lower constitutes an underutilized `rack storage`, but you can change this as best suits your needs
+First, we'll need to define **what we consider to be underutilized (as percent utilization)**. In this example, we'll suppose ***10%*** or lower constitutes an underutilized `rack storage`, but you can change this as best suits your needs
 
 ```powershell
 $minimumUtilization=10
@@ -97,7 +97,7 @@ $underutilizedRacks | ForEach-Object {New-HuduFlag -flagTypeId $racksFlag.id -fl
 
 ## Scenario 6: we want to flag external networks so that they will be recognized and **handled with care**
 
-This one is pretty straightforward and doesn't require any user-defined variables. It can help to make **external** `networks` easily identifiable so they may be handled with extra care
+This one is pretty straightforward and doesn't require any user-defined variables. We're just selecting for **external** `networks`. It can help to make these external `networks` easily identifiable so they may be *handled with extra care*
 
 ```powershell
 $externalNetworks = Get-HuduNetworks | Where-Object {[int]($_.network_type) -eq 1}
