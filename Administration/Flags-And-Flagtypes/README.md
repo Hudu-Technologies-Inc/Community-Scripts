@@ -1,6 +1,6 @@
 # Flagging items can help identify critical items, high-sensitivity areas, items that need attention, or other conditions that require a second thought.
 
-### Here are some ways you can easily add such flags and apply them to suit your organizations needs!
+### Here are some ways you can easily add such flags and apply them to suit your organizations needs-
 
 `Flags` and `FlagTypes` can help tighten focus around items in Hudu that need special care, more attention, review or revision. Being a powerful feature set for organization and notation, it's a good capability to have a handle on as a Hudu user, administrator or power-user.
 
@@ -21,9 +21,9 @@
 While these are general categories that something might fit in, how you use them is up to you. 
 #### The best part? You can pick from a variety of colors to represent any of your `FlagTypes`
 
-You might have a `FlagType` named 'Needs Attention' or 'Under Review' for **quality assurance purposes** with the color Orange !
+You might have a `FlagType` named 'Needs Attention' or 'Under Review' for **quality assurance purposes** with the color Orange
 
-You might have a `FlagType` named 'Handle With Care' or 'Special Case' for **special cases or edge cases** with the color Pink !
+You might have a `FlagType` named 'Handle With Care' or 'Special Case' for **special cases or edge cases** with the color Pink
 
 You might have a `FlagType` named 'Mason' or 'Cameron' **to define ownership of article or object** with the color Green
 
