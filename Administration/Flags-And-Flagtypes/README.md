@@ -22,10 +22,15 @@ While these are general categories that something might fit in, how you use them
 #### The best part? You can pick from a variety of colors to represent any of your `FlagTypes`
 
 You might have a `FlagType` named 'Needs Attention' or 'Under Review' for **quality assurance purposes** with the color Orange
+
 You might have a `FlagType` named 'Handle With Care' or 'Special Case' for **special cases or edge cases** with the color Pink
+
 You might have a `FlagType` named 'Mason' or 'Cameron' **to define ownership of article or object** with the color Green
+
 You might have a `FlagType` named 'Wild Child' or 'Cash on Delivery' **to define characteristics of a company** with the color Purple
+
 You might have a `FlagType` named 'Deprecated' or 'EOL' **to flag objects that aren't going to be in use much longer** with the color Blue
+
 You might have a `FlagType` named 'In-Service', 'Checked-Out' or 'Not-In-Service' **to flag objects that are in a special state** with the color Grey
 
 ### Notes on Flags
