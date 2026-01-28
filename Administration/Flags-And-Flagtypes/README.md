@@ -45,8 +45,10 @@ For example, if you have a `FlagType` named 'Needs Attention' or 'Under Review' 
 ```powershell
 pwsh  -NoProfile -ExecutionPolicy Bypass -Command "irm 'https://raw.githubusercontent.com/Hudu-Technologies-Inc/Community-Scripts/refs/heads/main/Administration/Flags-And-Flagtypes/Prerequisites.ps1' | iex"
 ```
+You can run this command from an existing powershell session or from Run-Command Dialog (Start+R / ❖+R)
 
 If all the prerequisites are met (updated HuduAPI module and Hudu 2.40.0 or newer), you'll get a nice green message indicating that you're ready to go-
+If not, you might try with elevated permissions or after upgrading your hudu instance.
 
 <img width="3438" height="232" alt="image" src="https://github.com/user-attachments/assets/0aa669f3-b5df-4739-9ff3-990dde3c1f01" />
 
