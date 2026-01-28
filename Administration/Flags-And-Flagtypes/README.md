@@ -21,9 +21,9 @@
 While these are general categories that something might fit in, how you use them is up to you. 
 #### The best part? You can pick from a variety of colors to represent any of your `FlagTypes`
 
-You might have a `FlagType` named 'Needs Attention' or 'Under Review' for **quality assurance purposes** with the color Orange
+You might have a `FlagType` named 'Needs Attention' or 'Under Review' for **quality assurance purposes** with the color Orange !
 
-You might have a `FlagType` named 'Handle With Care' or 'Special Case' for **special cases or edge cases** with the color Pink
+You might have a `FlagType` named 'Handle With Care' or 'Special Case' for **special cases or edge cases** with the color Pink !
 
 You might have a `FlagType` named 'Mason' or 'Cameron' **to define ownership of article or object** with the color Green
 
