@@ -5,7 +5,7 @@
 ## Firstly, you'll need to load the prerequisite helper functions with this nifty oneliner (using pwsh7+), then you're ready to roll-
 
 ```powershell
-pwsh  -NoProfile -ExecutionPolicy Bypass -Command "irm 'https://raw.githubusercontent.com/Hudu-Technologies-Inc/Community-Scripts/refs/heads/main/Administration/Flags-And-FlagTypes/Prerequisites.ps1' | iex"
+pwsh  -NoProfile -ExecutionPolicy Bypass -Command "irm 'https://raw.githubusercontent.com/Hudu-Technologies-Inc/Community-Scripts/refs/heads/main/Administration/Flags-And-Flagtypes/Prerequisites.ps1' | iex"
 ```
 
 If all the prerequisites are met (updated HuduAPI module and Hudu 2.40.0 or newer), you'll get a nice green message indicating that you're ready to go-
