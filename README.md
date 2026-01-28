@@ -7,6 +7,7 @@ Collection of Hudu Community Scripts for anyone to use/run/remix/reference.
   - [CSS and Customization](CSS-And-Customization/)
   
 - **Administration**
+  - [Flagging Items in Hudu](Administration/Flags-And-FlagTypes/)
   - [Doubletake Postgres Backups](Administration/DoubleTake-Backups/)
   - [Dropdown to ListSelect](Administration/Dropdown-To-ListSelect/)
   - [RBAC and Access Info](Administration/RBAC-and-Access-Info/)
