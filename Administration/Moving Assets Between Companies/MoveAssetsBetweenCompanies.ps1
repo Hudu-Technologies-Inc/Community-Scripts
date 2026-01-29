@@ -567,10 +567,18 @@ $failCount = 0
 foreach ($a in $matches) {
   $id = $a.id
   try {
-    # PATCH asset with new company_id
-    $null = Invoke-HuduApi -BaseUrl $baseUrl -ApiKey $apiKey -Method "PATCH" -Path ("/api/v1/assets/{0}" -f $id) -Body @{
-      company_id = $destCompany.id
-    }
+    # PUT asset update via company-scoped endpoint (common in Hudu)
+$currentCompanyId = Get-PropValue -Obj $a -Names @("company_id")
+if (-not $currentCompanyId) { $currentCompanyId = $sourceCompany.id }
+
+$null = Invoke-HuduApi `
+  -BaseUrl $baseUrl `
+  -ApiKey $apiKey `
+  -Method "PUT" `
+  -Path ("/api/v1/companies/{0}/assets/{1}" -f $currentCompanyId, $id) `
+  -Body @{
+    company_id = $destCompany.id
+  }
 
     $okCount++
     [void]$log.Add([pscustomobject]@{
@@ -583,16 +591,27 @@ foreach ($a in $matches) {
     })
   }
   catch {
-    $failCount++
-    [void]$log.Add([pscustomobject]@{
-      asset_id    = $id
-      asset_name  = $a.name
-      from_company= $sourceCompany.name
-      to_company  = $destCompany.name
-      status      = "FAILED"
-      message     = $_.Exception.Message
-    })
-  }
+  $failCount++
+
+  $detail = $_.Exception.Message
+  try {
+    if ($_.Exception.Response -and $_.Exception.Response.GetResponseStream) {
+      $sr = New-Object System.IO.StreamReader($_.Exception.Response.GetResponseStream())
+      $bodyText = $sr.ReadToEnd()
+      if ($bodyText) { $detail = "$detail | Body: $bodyText" }
+    }
+  } catch {}
+
+  [void]$log.Add([pscustomobject]@{
+    asset_id     = $id
+    asset_name   = $a.name
+    from_company = $sourceCompany.name
+    to_company   = $destCompany.name
+    status       = "FAILED"
+    message      = $detail
+  })
+}
+
 
   # small throttle (adjust/remove if desired)
   Start-Sleep -Milliseconds 150
