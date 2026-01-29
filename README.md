@@ -8,6 +8,7 @@ Collection of Hudu Community Scripts for anyone to use/run/remix/reference.
   
 - **Administration**
   - [Flagging Items in Hudu](https://github.com/Hudu-Technologies-Inc/Community-Scripts/tree/main/Administration/Flags-And-Flagtypes)
+  - [RBAC and Access Info](Administration/Auditing-Activity-Logs/)
   - [Doubletake Postgres Backups](Administration/DoubleTake-Backups/)
   - [Dropdown to ListSelect](Administration/Dropdown-To-ListSelect/)
   - [RBAC and Access Info](Administration/RBAC-and-Access-Info/)
