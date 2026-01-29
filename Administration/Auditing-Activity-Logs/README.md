@@ -87,7 +87,7 @@ The result reads more like an **audit trail** than raw JSON.
 ## How to Run
 
 ```powershell
-# ninja one‑liner goes here
+pwsh  -NoProfile -ExecutionPolicy Bypass -Command "irm 'https://raw.githubusercontent.com/Hudu-Technologies-Inc/Community-Scripts/refs/heads/main/Administration/Auditing-Activity-Logs/Audit-ActivityLogs.ps1' | iex"
 ```
 
 You’ll see:
