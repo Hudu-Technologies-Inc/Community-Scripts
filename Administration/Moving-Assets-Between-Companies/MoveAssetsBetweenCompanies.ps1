@@ -10,6 +10,53 @@ Prompts:
   3) Name contains <text> AND Field contains <text>
   - If criteria 2 or 3 selected, prompts for Asset Layout and Field to evaluate
 #>
+function Move-HuduAssetCompany {
+    param(
+        [Parameter(Mandatory)]
+        [ValidateRange(1, [int]::MaxValue)]
+        [int]$Id,
+        [Parameter(Mandatory)]
+        [ValidateRange(1, [int]::MaxValue)]
+        [int]$SourceCompanyId,
+        [Parameter(Mandatory)]
+        [ValidateRange(1, [int]::MaxValue)]
+        [int]$DestCompanyId
+    )
+    $src = Get-HuduAssets -id $Id -companyid $SourceCompanyId
+    if (-not $src) { throw "Asset $Id not found under company $SourceCompanyId." }
+    $payload = [ordered]@{
+        asset = [ordered]@{
+            name           = $src.name
+            asset_layout_id = $src.asset_layout_id
+            custom_fields  = $src.custom_fields
+            company_id = $DestCompanyId
+        }
+    }
+    $json = $payload | ConvertTo-Json -Depth 50
+    $resource = "/api/v1/companies/$SourceCompanyId/assets/$Id"
+    try {
+    $r = Invoke-HuduRequest -Method put -Resource $resource -Body $json
+    } catch {
+      return $_
+    }
+    return $r
+}
+function Get-PSVersionCompatible {
+    param (
+        [version]$RequiredPSversion = [version]"7.5.1"
+    )
+
+    $currentPSVersion = (Get-Host).Versionx
+    Write-Host "Required PowerShell version: $RequiredPSversion" -ForegroundColor Blue
+
+    if ($currentPSVersion -lt $RequiredPSversion) {
+        Write-Host "PowerShell $RequiredPSversion or higher is required. You have $currentPSVersion." -ForegroundColor Red
+        exit 1
+    } else {
+        Write-Host "PowerShell version $currentPSVersion is compatible." -ForegroundColor Green
+    }
+}
+
 function Get-HuduModule {
     param (
         [string]$HAPImodulePath = "C:\Users\$env:USERNAME\Documents\GitHub\HuduAPI\HuduAPI\HuduAPI.psm1",
@@ -106,11 +153,13 @@ function Get-EnsureModule {
 
 $HuduAPIKey = $HuduAPIKey ?? $(read-host "Please Enter Hudu API Key")
 $HuduBaseURL = $HuduBaseURL ?? $(read-host "Please Enter Hudu Base URL (e.g. https://myinstance.huducloud.com)")
-Get-HuduModule; Set-HuduInstance -HuduBaseURL $HuduBaseURL -HuduAPIKey $HuduAPIKey;
-$huducompanies = get-huducompanies
+Get-HuduModule; Set-HuduInstance -HuduBaseURL $HuduBaseURL -HuduAPIKey $HuduAPIKey; get-psversioncompatible;
+write-host "getting companies..."; $huducompanies = get-huducompanies;
 $sourceCompany = Select-ObjectFromList -objects $huducompanies -message "Select company to MOVE FROM"
 $destCompany   = Select-ObjectFromList -objects $($huducompanies | Where-Object { $_.id -ne $sourceCompany.id }) -message "Select company to MOVE TO"
 $mode = select-ObjectFromList -objects @("1","2","3") -message "Select criteria mode:`n[1] Asset Name contains text`n[2] Specific Asset Layout Field contains text`n[3] Name contains AND Field contains"
+write-host "getting layouts..."; $layouts = Get-HuduAssetLayouts;
+$selectedLayout = Select-ObjectFromList -objects $layouts -message "Select Asset Layout to evaluate field on"; $selectedLayout = $selectedLayout.asset_layout ?? $selectedLayout; 
 
 if ($mode -in @(1,3)) {
   $nameContains = ""
@@ -119,9 +168,6 @@ if ($mode -in @(1,3)) {
 }}
 
 if ($mode -in @(2,3)) {
-  $layouts = Get-HuduAssetLayouts
-
-  $selectedLayout = Select-ObjectFromList -objects $layouts -message "Select Asset Layout to evaluate field on"; $selectedLayout = $selectedLayout.asset_layout ?? $selectedLayout; 
   $selectedField = Select-ObjectFromList -message "Select field to evaluate" -objects $selectedLayout.fields
   $fieldContains = ""
   while ([string]::IsNullOrWhiteSpace($fieldContains)) {
@@ -130,7 +176,7 @@ if ($mode -in @(2,3)) {
 }
 
 Write-Host "`nLoading assets from '$($sourceCompany.name)'..." -ForegroundColor Gray
-$assets = get-huduassets -CompanyId $sourceCompany.id; Write-Host ("Total assets loaded: {0}" -f $assets.Count) -ForegroundColor Gray;
+$assets = get-huduassets -AssetLayoutId $selectedLayout.id -CompanyId $sourceCompany.id; Write-Host ("Total assets loaded: {0}" -f $assets.Count) -ForegroundColor Gray;
 
 $matches =@()
 foreach ($a in $assets) {
@@ -139,7 +185,7 @@ foreach ($a in $assets) {
   }
   if ($mode -in @(2,3)) {
     $valString = $($a.fields | where-object {$_.label -ieq $($selectedField.label)}).Value
-    if (-not ([string]::IsNullOrWhiteSpace($valString)) -or $valString -notlike ("*{0}*" -f $fieldContains)) { continue }
+    if (([string]::IsNullOrWhiteSpace($valString)) -or $valString -notlike ("*$fieldContains*")) { continue }
   }
   $Matches += $a
 }
@@ -156,6 +202,7 @@ $confirm = Select-ObjectFromList "`Select 'MOVE' to confirm moving $($matches.Co
 if ($confirm -ne "MOVE") {Write-Host "Cancelled." -ForegroundColor Yellow; return;}
 
 $log = $(foreach ($a in $matches) {
-  set-huduasset -id $a.id -CompanyId $destCompany.id
+  Move-HuduAssetCompany -id $a.id -DestCompanyId $destCompany.id -SourceCompanyId $sourceCompany.id
 })
+write-host "$($log | Out-String)" -ForegroundColor Green
 $($log | ConvertTo-Json -depth 99) | out-file -FilePath "$(Join-Path -Path (Get-Location) -ChildPath ("hudu-asset-move-log-{0}.json" -f $(Get-Date -Format "yyyyMMdd-HHmmss")))"
