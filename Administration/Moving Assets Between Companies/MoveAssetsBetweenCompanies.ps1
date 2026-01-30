@@ -109,9 +109,7 @@ function Get-EnsureModule {
 $HuduAPIKey = $HuduAPIKey ?? $(read-host "Please Enter Hudu API Key")
 $HuduBaseURL = $HuduBaseURL ?? $(read-host "Please Enter Hudu Base URL (e.g. https://myinstance.huducloud.com)")
 Get-HuduModule; Set-HuduInstance -HuduBaseURL $HuduBaseURL -HuduAPIKey $HuduAPIKey;
-
 $huducompanies = get-huducompanies
-
 $sourceCompany = Select-ObjectFromList -objects $huducompanies -message "Select company to MOVE FROM"`
 $destCompany   = select-ObjectFromList -objects $($huducompanies | Where-Object { $_.id -ne $sourceCompany.id }) -message "Select company to MOVE TO"
 $mode = select-ObjectFromList -objects @("1","2","3") -message "Select criteria mode:`n[1] Asset Name contains text`n[2] Specific Asset Layout Field contains text`n[3] Name contains AND Field contains"
@@ -157,4 +155,4 @@ if ($confirm -ne "MOVE") {Write-Host "Cancelled." -ForegroundColor Yellow; retur
 $log = $(foreach ($a in $matches) {
   set-huduasset -id $a.id -CompanyId $destCompany.id
 })
-$($log | ConvertTo-Json -depth 99) | out-file -FilePath "$(Join-Path -Path (Get-Location) -ChildPath ("hudu-asset-move-log-{0}.csv" -f $(Get-Date -Format "yyyyMMdd-HHmmss")))"
+$($log | ConvertTo-Json -depth 99) | out-file -FilePath "$(Join-Path -Path (Get-Location) -ChildPath ("hudu-asset-move-log-{0}.json" -f $(Get-Date -Format "yyyyMMdd-HHmmss")))"
