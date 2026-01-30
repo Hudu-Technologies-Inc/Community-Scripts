@@ -123,7 +123,10 @@ if ($mode -in @(2,3)) {
 
   $selectedLayout = Select-ObjectFromList -objects $layouts -message "Select Asset Layout to evaluate field on"; $selectedLayout = $selectedLayout.asset_layout ?? $selectedLayout; 
   $selectedField = Select-ObjectFromList -message "Select field to evaluate" -objects $selectedLayout.fields
-  $fieldContains = Read-NonEmpty -Prompt "Enter text that the selected field must contain"
+  $fieldContains = ""
+  while ([string]::IsNullOrWhiteSpace($fieldContains)) {
+    $fieldContains = read-host "Enter text that the selected field must contain"
+  }
 }
 
 Write-Host "`nLoading assets from '$($sourceCompany.name)'..." -ForegroundColor Gray
