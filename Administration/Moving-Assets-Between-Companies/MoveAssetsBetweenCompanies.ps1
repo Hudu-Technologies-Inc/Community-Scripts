@@ -132,15 +132,16 @@ if ($mode -in @(2,3)) {
 Write-Host "`nLoading assets from '$($sourceCompany.name)'..." -ForegroundColor Gray
 $assets = get-huduassets -CompanyId $sourceCompany.id; Write-Host ("Total assets loaded: {0}" -f $assets.Count) -ForegroundColor Gray;
 
-$matches = foreach ($a in $assets) {
+$matches =@()
+foreach ($a in $assets) {
   if ($mode -in @(1,3)) {
     if ("$nameContains" -ilike "*$($a.name)*") { continue }
   }
-  if ($ok -and $mode -in @(2,3)) {
+  if ($mode -in @(2,3)) {
     $valString = $($a.fields | where-object {$_.label -ieq $($selectedField.label)}).Value
     if (-not ([string]::IsNullOrWhiteSpace($valString)) -or $valString -notlike ("*{0}*" -f $fieldContains)) { continue }
   }
-  if ($ok) { $a }
+  $Matches += $a
 }
 Write-Host ("`nMatched assets to move: {0}" -f ($matches.Count)) -ForegroundColor Green
 
