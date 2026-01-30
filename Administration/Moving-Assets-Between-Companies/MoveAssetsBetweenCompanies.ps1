@@ -22,7 +22,7 @@ function Move-HuduAssetCompany {
         [ValidateRange(1, [int]::MaxValue)]
         [int]$DestCompanyId
     )
-    $src = Get-HuduAssets -id $Id -companyid $SourceCompanyId
+    $src = Get-HuduAssets -id $Id
     if (-not $src) { throw "Asset $Id not found under company $SourceCompanyId." }
     $payload = [ordered]@{
         asset = [ordered]@{
@@ -33,7 +33,7 @@ function Move-HuduAssetCompany {
         }
     }
     $json = $payload | ConvertTo-Json -Depth 50
-    $resource = "/api/v1/companies/$SourceCompanyId/assets/$Id"
+    $resource = "/api/v1/companies/$sourcecompanyId/assets/$Id"
     try {
     $r = Invoke-HuduRequest -Method put -Resource $resource -Body $json
     } catch {
@@ -153,7 +153,7 @@ function Get-EnsureModule {
 
 $HuduAPIKey = $HuduAPIKey ?? $(read-host "Please Enter Hudu API Key")
 $HuduBaseURL = $HuduBaseURL ?? $(read-host "Please Enter Hudu Base URL (e.g. https://myinstance.huducloud.com)")
-Get-HuduModule; Set-HuduInstance -HuduBaseURL $HuduBaseURL -HuduAPIKey $HuduAPIKey; get-psversioncompatible;
+Get-HuduModule; Set-HuduInstance -HuduBaseURL $HuduBaseURL -HuduAPIKey $HuduAPIKey;
 write-host "getting companies..."; $huducompanies = get-huducompanies;
 $sourceCompany = Select-ObjectFromList -objects $huducompanies -message "Select company to MOVE FROM"
 $destCompany   = Select-ObjectFromList -objects $($huducompanies | Where-Object { $_.id -ne $sourceCompany.id }) -message "Select company to MOVE TO"
@@ -181,7 +181,7 @@ $assets = get-huduassets -AssetLayoutId $selectedLayout.id -CompanyId $sourceCom
 $matches =@()
 foreach ($a in $assets) {
   if ($mode -in @(1,3)) {
-    if ("$nameContains" -ilike "*$($a.name)*") { continue }
+    if (-not ("$($a.name)" -ilike "*$nameContains*")) { continue }
   }
   if ($mode -in @(2,3)) {
     $valString = $($a.fields | where-object {$_.label -ieq $($selectedField.label)}).Value
