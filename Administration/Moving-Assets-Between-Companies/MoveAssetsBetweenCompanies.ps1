@@ -10,8 +10,6 @@ Prompts:
   3) Name contains <text> AND Field contains <text>
   - If criteria 2 or 3 selected, prompts for Asset Layout and Field to evaluate
 #>
-Set-StrictMode -Version Latest
-$ErrorActionPreference = "Stop"
 function Get-HuduModule {
     param (
         [string]$HAPImodulePath = "C:\Users\$env:USERNAME\Documents\GitHub\HuduAPI\HuduAPI\HuduAPI.psm1",
