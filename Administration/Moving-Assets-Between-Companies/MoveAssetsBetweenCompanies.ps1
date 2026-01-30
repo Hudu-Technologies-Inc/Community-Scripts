@@ -113,8 +113,10 @@ $destCompany   = Select-ObjectFromList -objects $($huducompanies | Where-Object 
 $mode = select-ObjectFromList -objects @("1","2","3") -message "Select criteria mode:`n[1] Asset Name contains text`n[2] Specific Asset Layout Field contains text`n[3] Name contains AND Field contains"
 
 if ($mode -in @(1,3)) {
-  $nameContains = Read-NonEmpty -Prompt "Enter text that the Asset Name must contain"
-}
+  $nameContains = ""
+  while ([string]::IsNullOrWhiteSpace($nameContains)) {
+  $nameContains = read-host "Enter text that the Asset Name must contain"
+}}
 
 if ($mode -in @(2,3)) {
   $layouts = Get-HuduAssetLayouts
