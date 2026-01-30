@@ -122,11 +122,11 @@ $HuduAPIKey = $HuduAPIKey ?? $(read-host "Please Enter Hudu API Key")
 $HuduBaseURL = $HuduBaseURL ?? $(read-host "Please Enter Hudu Base URL (e.g. https://myinstance.huducloud.com)")
 Get-HuduModule; Set-HuduInstance -HuduBaseURL $HuduBaseURL -HuduAPIKey $HuduAPIKey;
 write-host "getting companies..."; $huducompanies = get-huducompanies;
-$sourceCompany = Select-ObjectFromList -objects $huducompanies -message "Select company to MOVE FROM"
-$destCompany   = Select-ObjectFromList -objects $($huducompanies | Where-Object { $_.id -ne $sourceCompany.id }) -message "Select company to MOVE TO"
+$sourceCompany = Select-ObjectFromList -objects ($huducompanies | sort-object {$_.name}) -message "Select company to MOVE FROM"
+$destCompany   = Select-ObjectFromList -objects $($huducompanies | Where-Object { $_.id -ne $sourceCompany.id } | sort-object {$_.name}) -message "Select company to MOVE TO"
 $mode = select-ObjectFromList -objects @("1","2","3") -message "Select criteria mode:`n[1] Asset Name contains text`n[2] Specific Asset Layout Field contains text`n[3] Name contains AND Field contains"
 write-host "getting layouts..."; $layouts = Get-HuduAssetLayouts;
-$selectedLayout = Select-ObjectFromList -objects $layouts -message "Select Asset Layout to evaluate field on"; $selectedLayout = $selectedLayout.asset_layout ?? $selectedLayout; 
+$selectedLayout = Select-ObjectFromList -objects $($layouts | Sort-Object {$_.name}) -message "Select Asset Layout to evaluate field on"; $selectedLayout = $selectedLayout.asset_layout ?? $selectedLayout; 
 
 if ($mode -in @(1,3)) {
   $nameContains = ""
@@ -135,7 +135,7 @@ if ($mode -in @(1,3)) {
 }}
 
 if ($mode -in @(2,3)) {
-  $selectedField = Select-ObjectFromList -message "Select field to evaluate" -objects $selectedLayout.fields; $fieldContains = "";
+  $selectedField = Select-ObjectFromList -message "Select field to evaluate" -objects ($selectedLayout.fields | Where-Object {@("DropDown","ListSelect","AssetTag") -notcontains $_.field_type} | sort-object {$_.label}); $fieldContains = "";
   while ([string]::IsNullOrWhiteSpace($fieldContains)) {
     $fieldContains = read-host "Enter text that the selected field must contain"
   }
