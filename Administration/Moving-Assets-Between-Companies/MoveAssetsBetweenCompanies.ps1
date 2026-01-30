@@ -185,7 +185,7 @@ foreach ($a in $assets) {
   }
   if ($mode -in @(2,3)) {
     $valString = $($a.fields | where-object {$_.label -ieq $($selectedField.label)}).Value
-    if (([string]::IsNullOrWhiteSpace($valString)) -or $valString -notlike ("*$fieldContains*")) { continue }
+    if (([string]::IsNullOrWhiteSpace($valString)) -or -not ($valString -ilike "*$fieldContains*")) { continue }
   }
   $Matches += $a
 }
