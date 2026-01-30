@@ -8,6 +8,7 @@ Collection of Hudu Community Scripts for anyone to use/run/remix/reference.
   
 - **Administration**
   - [Flagging Items in Hudu](https://github.com/Hudu-Technologies-Inc/Community-Scripts/tree/main/Administration/Flags-And-Flagtypes)
+  - [Moving Certain Assets Between Companies](https://github.com/Hudu-Technologies-Inc/Community-Scripts/tree/main/Administration/Moving-Assets-Between-Companies/)
   - [Auditing Activity Logs](Administration/Auditing-Activity-Logs/)
   - [Doubletake Postgres Backups](Administration/DoubleTake-Backups/)
   - [Dropdown to ListSelect](Administration/Dropdown-To-ListSelect/)
