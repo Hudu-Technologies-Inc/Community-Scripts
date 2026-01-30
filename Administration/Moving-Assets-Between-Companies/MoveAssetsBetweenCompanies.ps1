@@ -41,22 +41,6 @@ function Move-HuduAssetCompany {
     }
     return $r
 }
-function Get-PSVersionCompatible {
-    param (
-        [version]$RequiredPSversion = [version]"7.5.1"
-    )
-
-    $currentPSVersion = (Get-Host).Versionx
-    Write-Host "Required PowerShell version: $RequiredPSversion" -ForegroundColor Blue
-
-    if ($currentPSVersion -lt $RequiredPSversion) {
-        Write-Host "PowerShell $RequiredPSversion or higher is required. You have $currentPSVersion." -ForegroundColor Red
-        exit 1
-    } else {
-        Write-Host "PowerShell version $currentPSVersion is compatible." -ForegroundColor Green
-    }
-}
-
 function Get-HuduModule {
     param (
         [string]$HAPImodulePath = "C:\Users\$env:USERNAME\Documents\GitHub\HuduAPI\HuduAPI\HuduAPI.psm1",
@@ -146,11 +130,9 @@ function Get-EnsureModule {
         Write-Warning "Failed to import module '$Name': $($_.Exception.Message)"
     }
 }
-
 # -----------------------------
 # Start
 # -----------------------------
-
 $HuduAPIKey = $HuduAPIKey ?? $(read-host "Please Enter Hudu API Key")
 $HuduBaseURL = $HuduBaseURL ?? $(read-host "Please Enter Hudu Base URL (e.g. https://myinstance.huducloud.com)")
 Get-HuduModule; Set-HuduInstance -HuduBaseURL $HuduBaseURL -HuduAPIKey $HuduAPIKey;
@@ -168,8 +150,7 @@ if ($mode -in @(1,3)) {
 }}
 
 if ($mode -in @(2,3)) {
-  $selectedField = Select-ObjectFromList -message "Select field to evaluate" -objects $selectedLayout.fields
-  $fieldContains = ""
+  $selectedField = Select-ObjectFromList -message "Select field to evaluate" -objects $selectedLayout.fields; $fieldContains = "";
   while ([string]::IsNullOrWhiteSpace($fieldContains)) {
     $fieldContains = read-host "Enter text that the selected field must contain"
   }
@@ -193,16 +174,11 @@ Write-Host ("`nMatched assets to move: {0}" -f ($matches.Count)) -ForegroundColo
 
 if ($matches.Count -gt 0) {
   Write-Host "`nPreview (up to 20):" -ForegroundColor Cyan
-  $matches | Select-Object -First 20 | ForEach-Object {
-    write-host "$($($_ | ConvertTo-Json -Depth 5 | Out-String))`n" -ForegroundColor Yellow
-  }
-}
-
+  $matches | Select-Object -First 20 | ForEach-Object {write-host "$($($_ | ConvertTo-Json -Depth 5 | Out-String))`n" -ForegroundColor Yellow}
+} else {write-host "No matches."; return;}
 $confirm = Select-ObjectFromList "`Select 'MOVE' to confirm moving $($matches.Count) assets from '$($sourceCompany.name)' to '$($destCompany.name)', or anything else to cancel." -objects @("MOVE","CANCEL")
 if ($confirm -ne "MOVE") {Write-Host "Cancelled." -ForegroundColor Yellow; return;}
 
-$log = $(foreach ($a in $matches) {
-  Move-HuduAssetCompany -id $a.id -DestCompanyId $destCompany.id -SourceCompanyId $sourceCompany.id
-})
+$log = $(foreach ($a in $matches) {Move-HuduAssetCompany -id $a.id -DestCompanyId $destCompany.id -SourceCompanyId $sourceCompany.id})
 write-host "$($log | Out-String)" -ForegroundColor Green
 $($log | ConvertTo-Json -depth 99) | out-file -FilePath "$(Join-Path -Path (Get-Location) -ChildPath ("hudu-asset-move-log-{0}.json" -f $(Get-Date -Format "yyyyMMdd-HHmmss")))"
