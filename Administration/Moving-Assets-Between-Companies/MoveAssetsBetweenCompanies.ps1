@@ -108,8 +108,8 @@ $HuduAPIKey = $HuduAPIKey ?? $(read-host "Please Enter Hudu API Key")
 $HuduBaseURL = $HuduBaseURL ?? $(read-host "Please Enter Hudu Base URL (e.g. https://myinstance.huducloud.com)")
 Get-HuduModule; Set-HuduInstance -HuduBaseURL $HuduBaseURL -HuduAPIKey $HuduAPIKey;
 $huducompanies = get-huducompanies
-$sourceCompany = Select-ObjectFromList -objects $huducompanies -message "Select company to MOVE FROM"`
-$destCompany   = select-ObjectFromList -objects $($huducompanies | Where-Object { $_.id -ne $sourceCompany.id }) -message "Select company to MOVE TO"
+$sourceCompany = Select-ObjectFromList -objects $huducompanies -message "Select company to MOVE FROM"
+$destCompany   = Select-ObjectFromList -objects $($huducompanies | Where-Object { $_.id -ne $sourceCompany.id }) -message "Select company to MOVE TO"
 $mode = select-ObjectFromList -objects @("1","2","3") -message "Select criteria mode:`n[1] Asset Name contains text`n[2] Specific Asset Layout Field contains text`n[3] Name contains AND Field contains"
 
 if ($mode -in @(1,3)) {
