@@ -134,11 +134,10 @@ $assets = get-huduassets -CompanyId $sourceCompany.id; Write-Host ("Total assets
 
 $matches = foreach ($a in $assets) {
   if ($mode -in @(1,3)) {
-    $n = [string]$a.name
-    if ($n -notlike ("*{0}*" -f $nameContains)) { continue }
+    if ("$nameContains" -ilike "*$($a.name)*") { continue }
   }
   if ($ok -and $mode -in @(2,3)) {
-    $valString = $($a.fields | where-object {$_.label -ieq $($selectedField.name)}).Value
+    $valString = $($a.fields | where-object {$_.label -ieq $($selectedField.label)}).Value
     if (-not ([string]::IsNullOrWhiteSpace($valString)) -or $valString -notlike ("*{0}*" -f $fieldContains)) { continue }
   }
   if ($ok) { $a }
