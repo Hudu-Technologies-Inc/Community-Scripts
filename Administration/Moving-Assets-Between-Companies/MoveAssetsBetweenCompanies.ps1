@@ -115,21 +115,6 @@ function Select-ObjectFromList($objects, $message, $allowNull = $false) {
         if ($choice -ge 1 -and $choice -le $objects.Count) {return $objects[$choice - 1]} else {Write-Host "Invalid selection. Please enter a number from the list." -ForegroundColor Red}
     }
 }
-function Get-EnsureModule {
-    param (
-        [Parameter(Mandatory)]
-        [string]$Name
-    )
-    if (-not (Get-Module -ListAvailable -Name $Name)) {
-        Install-Module -Name $Name -Scope CurrentUser -Repository PSGallery -Force -AllowClobber `
-            -ErrorAction SilentlyContinue *> $null
-    }
-    try {
-        Import-Module -Name $Name -Force -ErrorAction Stop *> $null
-    } catch {
-        Write-Warning "Failed to import module '$Name': $($_.Exception.Message)"
-    }
-}
 # -----------------------------
 # Start
 # -----------------------------
@@ -181,4 +166,4 @@ if ($confirm -ne "MOVE") {Write-Host "Cancelled." -ForegroundColor Yellow; retur
 
 $log = $(foreach ($a in $matches) {Move-HuduAssetCompany -id $a.id -DestCompanyId $destCompany.id -SourceCompanyId $sourceCompany.id})
 write-host "$($log | Out-String)" -ForegroundColor Green
-$($log | ConvertTo-Json -depth 99) | out-file -FilePath "$(Join-Path -Path (Get-Location) -ChildPath ("hudu-asset-move-log-{0}.json" -f $(Get-Date -Format "yyyyMMdd-HHmmss")))"
+$logpath = "$(Join-Path -Path (Get-Location) -ChildPath ("hudu-asset-move-log-{0}.json" -f $(Get-Date -Format "yyyyMMdd-HHmmss")))"; $($log | ConvertTo-Json -depth 99) | out-file -FilePath $logPath; write-host "log written to $logpath";
