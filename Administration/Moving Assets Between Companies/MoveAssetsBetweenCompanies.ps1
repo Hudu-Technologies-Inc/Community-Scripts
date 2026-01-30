@@ -102,23 +102,6 @@ function Get-EnsureModule {
     }
 }
 
-function Read-NonEmpty {
-  param(
-    [Parameter(Mandatory)][string]$Prompt,
-    [switch]$AsSecure
-  )
-  while ($true) {
-    if ($AsSecure) {
-      $v = Read-Host -Prompt $Prompt -AsSecureString
-      if ($null -ne $v -and ($v.Length -gt 0)) { return $v }
-    } else {
-      $v = Read-Host -Prompt $Prompt
-      if (-not [string]::IsNullOrWhiteSpace($v)) { return $v.Trim() }
-    }
-    Write-Host "Value required." -ForegroundColor Yellow
-  }
-}
-
 # -----------------------------
 # Start
 # -----------------------------
