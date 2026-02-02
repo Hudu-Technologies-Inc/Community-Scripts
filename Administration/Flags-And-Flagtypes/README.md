@@ -43,7 +43,7 @@ For example, if you have a `FlagType` named 'Needs Attention' or 'Under Review' 
 ## Firstly, you'll need to load the prerequisite helper functions with this nifty oneliner (using pwsh7+), then you're ready to roll-
 
 ```powershell
-pwsh  -NoProfile -ExecutionPolicy Bypass -Command "irm 'https://raw.githubusercontent.com/Hudu-Technologies-Inc/Community-Scripts/refs/heads/main/Administration/Flags-And-Flagtypes/Prerequisites.ps1' | iex"
+irm 'https://raw.githubusercontent.com/Hudu-Technologies-Inc/Community-Scripts/refs/heads/main/Administration/Flags-And-Flagtypes/Prerequisites.ps1' | iex
 ```
 You can run this command from an existing powershell session or from Run-Command Dialog (Start+R / ❖+R)
 
