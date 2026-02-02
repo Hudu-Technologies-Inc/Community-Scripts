@@ -21,6 +21,7 @@ $AddressColor    = '#9aa0a6'
 $ActiveDeviceColor = "#00ea4aff"
 $reservedColor = "#ffff00"
 $InactiveColor = "#ff0000"
+$iconsArticleName = "Network Maps Icons"
 
 $OpenLinksInNewWindow = $false # Open links to assets, networks, vlans, zones, or addresses in new window or same window
 
@@ -71,13 +72,6 @@ $AvailableIcons = @(
 #>
     )
 
-$IconByType = @{
-  Network = ($AvailableIcons | ? Name -eq 'Switch'   | select -First 1).UploadId
-  VLAN    = ($AvailableIcons | ? Name -eq 'Container'| select -First 1).UploadId
-  Zone    = ($AvailableIcons | ? Name -eq 'DMZ'      | select -First 1).UploadId
-  Asset   = ($AvailableIcons | ? Name -eq 'Endpoint' | select -First 1).UploadId
-  Address = $null
-}
 
 # END OF CUSTOMIZATION OPTIONS
 function Set-SessionCulture {
@@ -91,24 +85,12 @@ function Set-SessionCulture {
 $Workdir = $(resolve-path .\)
 Set-SessionCulture "en-US"
 
-function Get-UploadUrlById([int]$id, [string]$HuduBaseUrl = $null){
+function Get-UploadUrlById([int]$id){
   if (-not $id) { return $null }
   $u = $AllUploads | Where-Object id -eq $id | Select-Object -First 1
   if (-not $u) { return $null }
-  # If Hudu returns a relative URL, prefix it:
-  if ($HuduBaseUrl -and $u.url -like '/*') { return ($HuduBaseUrl.TrimEnd('/') + $u.url) }
   return $u.url
 }
-
-$IconHrefByType = @{
-  Network = Get-UploadUrlById $IconByType.Network $HuduBaseURL
-  VLAN    = Get-UploadUrlById $IconByType.VLAN    $HuduBaseURL
-  Zone    = Get-UploadUrlById $IconByType.Zone    $HuduBaseURL
-  Asset   = Get-UploadUrlById $IconByType.Asset   $HuduBaseURL
-  Address = Get-UploadUrlById $IconByType.Address $HuduBaseURL
-}
-
-
 
 $HuduBaseURL = $HuduBaseURL ?? $(read-host "Enter hudu URL")
 $HuduAPIKey = $HuduAPIKey ?? $(read-host "Enter hudu api key")
@@ -1166,6 +1148,11 @@ if ($HuduBaseURL -eq "https://YourHuduUrl.huducloud.com"){
 
 
 Get-PSVersionCompatible; Get-HuduModule; Set-HuduInstance; Get-HuduVersionCompatible;
+$attributableArticle = Get-HuduArticles -name "Network Maps Icons" | select-object -first 1
+if (-not $attributableArticle) {
+    Write-Host "Creating '$iconsArticleName' article to hold network icons..." -ForegroundColor Yellow
+    $attributableArticle = New-HuduArticle -name $iconsArticleName -content "This article '$iconsArticleName' holds the reusable SVG icons used by the Network Maps script."; $attributableArticle = $attributableArticle.article ?? $attributableArticle;
+}
 $Alluploads = Get-HuduUploads
 foreach ($item in $AvailableIcons) {
     $fileLeaf  = "$($NetworkArticleNamingPrefix)$($item.Name)$($NetworkArticleNamingSuffix).$($item.Type)"
@@ -1179,7 +1166,7 @@ foreach ($item in $AvailableIcons) {
 
         if (-not $existing) {
             Write-Host "Uploading $($item.type), $($Item.name) from $($filepath) to $(get-hudubaseurl)"
-            $upload = New-HuduUpload -FilePath $filePath -uploadable_id 1 -uploadable_type "Company"
+            $upload = New-HuduUpload -FilePath $filePath -uploadable_id $attributableArticle.id -uploadable_type "Article"; $upload = $upload.upload ?? $upload;
             $item.UploadId = $upload.id
 
 
@@ -1190,6 +1177,20 @@ foreach ($item in $AvailableIcons) {
 
         try { Remove-Item -LiteralPath $filePath -ErrorAction SilentlyContinue } catch {}
     }
+}
+$IconByType = @{
+  Network = ($AvailableIcons | ? Name -eq 'Switch'   | select -First 1).UploadId
+  VLAN    = ($AvailableIcons | ? Name -eq 'Container'| select -First 1).UploadId
+  Zone    = ($AvailableIcons | ? Name -eq 'DMZ'      | select -First 1).UploadId
+  Asset   = ($AvailableIcons | ? Name -eq 'Endpoint' | select -First 1).UploadId
+  Address = $null
+}
+$IconHrefByType = @{
+  Network = Get-UploadUrlById $IconByType.Network
+  VLAN    = Get-UploadUrlById $IconByType.VLAN
+  Zone    = Get-UploadUrlById $IconByType.Zone
+  Asset   = Get-UploadUrlById $IconByType.Asset
+  Address = Get-UploadUrlById $IconByType.Address
 }
 $AllLists = Get-HuduLists
 if ($AllLists -and $AllLists.count -gt 1){
