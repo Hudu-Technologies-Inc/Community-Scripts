@@ -16,21 +16,27 @@ Instead of writing individual `Where-Object` filters every time you want to answ
 
 ---
 
-How to Run
+## How to Run
 
 Open a new pwsh7 session on your windows device and perform one of the following:
 
-the Ninja-Oneliner [Ninja-Style]
+### the Ninja-Oneliner [Ninja-Style]
 
+```powershell
 irm 'https://raw.githubusercontent.com/Hudu-Technologies-Inc/Community-Scripts/refs/heads/main/Administration/Auditing-Activity-Logs/Audit-ActivityLogs.ps1' | iex
+```
 
-Clone+Start [Samurai-Style] (requires git scm installed)
+### Clone+Start [Samurai-Style] (requires git scm installed)
 
+```powershell
 git clone https://github.com/Hudu-Technologies-Inc/Community-Scripts; cd .\Community-Scripts\Administration\Auditing-Activity-Logs; . .\Audit-ActivityLogs.ps1;
+```
 
-Download-Extract-Run [Ashigaru-Warrior-Style]
+### Download-Extract-Run [Ashigaru-Warrior-Style]
 
+```powershell
 Invoke-WebRequest https://codeload.github.com/Hudu-Technologies-Inc/Community-Scripts/zip/refs/heads/main -OutFile Community-Scripts.zip; Expand-Archive -Path .\Community-Scripts.zip; cd .\Community-Scripts\Community-Scripts-main\Administration\Auditing-Activity-Logs; . .\Audit-ActivityLogs.ps1;
+```
 
 ---
 
