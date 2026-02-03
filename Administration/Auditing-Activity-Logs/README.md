@@ -87,10 +87,10 @@ The result reads more like an **audit trail** than raw JSON.
 ## How to Run
 
 ```powershell
-pwsh  -NoProfile -ExecutionPolicy Bypass -Command "irm 'https://raw.githubusercontent.com/Hudu-Technologies-Inc/Community-Scripts/refs/heads/main/Administration/Auditing-Activity-Logs/Audit-ActivityLogs.ps1' | iex"
+irm 'https://raw.githubusercontent.com/Hudu-Technologies-Inc/Community-Scripts/refs/heads/main/Administration/Auditing-Activity-Logs/Audit-ActivityLogs.ps1' | iex
 ```
 
-You’ll see:
+After submitting required infos, You’ll see:
 
 1. A numbered list of **attributes** → pick one  
 2. A numbered list of **values** → pick one  
