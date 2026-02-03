@@ -12,6 +12,26 @@ Instead of writing individual `Where-Object` filters every time you want to answ
 
 …it pulls a sample of activity logs, lets you **pick an attribute**, then **pick a value**, and prints the matching logs back out in a readable, **story‑like format**.
 
+<img width="1561" height="602" alt="image" src="https://github.com/user-attachments/assets/0155a824-b66e-4b8b-a90e-129838191ec8" />
+
+---
+
+How to Run
+
+Open a new pwsh7 session on your windows device and perform one of the following:
+
+the Ninja-Oneliner [Ninja-Style]
+
+irm 'https://raw.githubusercontent.com/Hudu-Technologies-Inc/Community-Scripts/refs/heads/main/Administration/Auditing-Activity-Logs/Audit-ActivityLogs.ps1' | iex
+
+Clone+Start [Samurai-Style] (requires git scm installed)
+
+git clone https://github.com/Hudu-Technologies-Inc/Community-Scripts; cd .\Community-Scripts\Administration\Auditing-Activity-Logs; . .\Audit-ActivityLogs.ps1;
+
+Download-Extract-Run [Ashigaru-Warrior-Style]
+
+Invoke-WebRequest https://codeload.github.com/Hudu-Technologies-Inc/Community-Scripts/zip/refs/heads/main -OutFile Community-Scripts.zip; Expand-Archive -Path .\Community-Scripts.zip; cd .\Community-Scripts\Community-Scripts-main\Administration\Auditing-Activity-Logs; . .\Audit-ActivityLogs.ps1;
+
 ---
 
 ## Common Use Cases
@@ -81,14 +101,6 @@ For each matching activity log entry, the script prints a friendly summary inclu
 - **Timestamp** (`formatted_datetime`)
 
 The result reads more like an **audit trail** than raw JSON.
-
----
-
-## How to Run
-
-```powershell
-irm 'https://raw.githubusercontent.com/Hudu-Technologies-Inc/Community-Scripts/refs/heads/main/Administration/Auditing-Activity-Logs/Audit-ActivityLogs.ps1' | iex
-```
 
 After submitting required infos, You’ll see:
 
