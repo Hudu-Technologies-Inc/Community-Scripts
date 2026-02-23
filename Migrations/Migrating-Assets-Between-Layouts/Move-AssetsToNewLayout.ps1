@@ -1,5 +1,7 @@
-[version]$RequiredPSversion = [version]"7.5.1"
-$currentPSVersion = (Get-Host).Version
+$RequiredPSversion = [version]'7.5.1'
+$currentPSVersion  = $PSVersionTable.PSVersion
+if ($currentPSVersion -lt $RequiredPSversion) { throw "Need PowerShell $RequiredPSversion+, you have $currentPSVersion" } else {write-host "PowerShell version $currentPSVersion is compatible." -ForegroundColor Green}
+
 Write-Host "Required PowerShell version: $RequiredPSversion" -ForegroundColor Blue
 
 if ($currentPSVersion -lt $RequiredPSversion) {
@@ -8,34 +10,21 @@ if ($currentPSVersion -lt $RequiredPSversion) {
 } else {
     Write-Host "PowerShell version $currentPSVersion is compatible." -ForegroundColor Green
 }
-function Normalize-String {
-    param (
-        [Parameter(Mandatory = $true)]
-        [string]$InputString,
-        [switch]$PreserveWhitespace,
-        [switch]$PreserveExtension
-    )
-    $extension = ""
-    $basename = $InputString
-    if ($PreserveExtension) {
-        $extension = [IO.Path]::GetExtension($InputString)
-        $basename = [IO.Path]::GetFileNameWithoutExtension($InputString)
-    }
 
-    # Normalize Unicode (decompose accents), then remove non-ASCII
-    $normalized = $basename.Normalize([Text.NormalizationForm]::FormD)
-    $chars = $normalized.ToCharArray() | Where-Object {
-        ([Globalization.CharUnicodeInfo]::GetUnicodeCategory($_) -ne 'NonSpacingMark')
+function Get-CastIfNumeric {
+    param([Parameter(Mandatory)][object]$Value)
+    if ($Value -is [string]) {
+        $Value = $Value.Trim()
     }
-    $ascii = -join $chars
-    if ($PreserveWhitespace) {
-        $ascii = $ascii -replace '[^a-zA-Z0-9 _-]', ''
-    } else {
-        $ascii = $ascii -replace '[^a-zA-Z0-9]', ''
+    if ($Value -match '^[+-]?\d+(\.\d+)?$') {
+        try {
+            return [int][double]$Value
+        } catch {
+            return $null
+        }
     }
-    return "$ascii$extension"
+    return $null
 }
-
 
 function Limit-FilenameLength {
     param (
@@ -63,20 +52,76 @@ function Limit-FilenameLength {
         }
     }
 }
-function Normalize-Text {
-    param([string]$s)
-    if ([string]::IsNullOrWhiteSpace($s)) { return $null }
-    $s = $s.Trim().ToLowerInvariant()
-    $s = [regex]::Replace($s, '[\s_-]+', ' ')  # "primary_email" -> "primary email"
-    # strip diacritics (prénom -> prenom)
-    $formD = $s.Normalize([System.Text.NormalizationForm]::FormD)
-    $sb = New-Object System.Text.StringBuilder
-    foreach ($ch in $formD.ToCharArray()){
-        if ([System.Globalization.CharUnicodeInfo]::GetUnicodeCategory($ch) -ne
-            [System.Globalization.UnicodeCategory]::NonSpacingMark) { [void]$sb.Append($ch) }
+
+function Get-FieldTypeByLabel {
+    param(
+        [Parameter(Mandatory)][object[]]$LayoutFields
+    )
+    $typeByLabel = @{}
+    foreach ($lf in ($LayoutFields ?? @())) {
+        if (-not $lf.label) { continue }
+        $typeByLabel[$lf.label] = ($lf.field_type ?? $lf.type ?? 'Text')
     }
-    ($sb.ToString()).Normalize([System.Text.NormalizationForm]::FormC)
+    return $typeByLabel
 }
+
+function FieldsToLabelValueMap {
+    param([object[]]$Fields)
+
+    $map = @{}
+    foreach ($f in ($Fields ?? @())) {
+        if (-not $f) { continue }
+        $label = $f.label
+        if ([string]::IsNullOrWhiteSpace($label)) { continue }
+        $map[$label] = $f.value
+    }
+    return $map
+}
+
+function LabelValueMapToFields {
+    param(
+        [Parameter(Mandatory)][hashtable]$Map,
+        [object[]]$LayoutFields = $null
+    )
+
+    $out = @()
+
+    # Preserve layout ordering if given
+    if ($LayoutFields) {
+        $layoutLabels = @($LayoutFields | ForEach-Object { $_.label } | Where-Object { $_ })
+        foreach ($lab in $layoutLabels) {
+            if ($Map.ContainsKey($lab)) {
+                $out += @{ $lab = $Map[$lab] }
+            }
+        }
+        # Any extras not in layout
+        foreach ($k in $Map.Keys | Where-Object { $_ -notin $layoutLabels }) {
+            $out += @{ $k = $Map[$k] }
+        }
+    } else {
+        foreach ($k in $Map.Keys) { $out += @{ $k = $Map[$k] } }
+    }
+
+    return $out
+}
+
+function Is-BlankValue {
+    param([object]$Value)
+    if ($null -eq $Value) { return $true }
+
+    # AddressData / objects should count as blank only if no meaningful fields
+    if ($Value -is [hashtable] -or $Value -is [System.Collections.IDictionary] -or $Value -is [pscustomobject]) {
+        try {
+            $pairs = $Value.PSObject.Properties | ForEach-Object { $_.Value }
+            return -not ($pairs | Where-Object { -not (Is-BlankValue $_) } | Select-Object -First 1)
+        } catch {
+            return $false
+        }
+    }
+
+    return [string]::IsNullOrWhiteSpace([string]$Value)
+}
+
 function Test-Equiv {
     param([string]$A, [string]$B)
     $a = Normalize-Text $A; $b = Normalize-Text $B
@@ -158,132 +203,11 @@ function Get-Similarity {
     $maxLen = [double][Math]::Max($n,$m)
     return 1.0 - ($dist / $maxLen)
 }
-
-
-function Get-CastIfNumeric {
-    param(
-        [Parameter(Mandatory)]
-        [object]$Value
-    )
-
-    if ($Value -is [string]) {
-        $Value = $Value.Trim()
-    }
-
-    if ($Value -match '^[+-]?\d+(\.\d+)?$') {
-        try {
-            return [int][double]$Value
-        } catch {
-            return 0
-        }
-    }
-    return $Value
-}
-function Test-DateAfter {
-    param(
-        [Parameter(Mandatory)][string]$DateString,
-        [datetime]$Cutoff = [datetime]'1000-01-01'
-    )
-    $dt = $null
-    $ok = [datetime]::TryParseExact(
-        $DateString,
-        'yyyy-MM-dd',
-        [System.Globalization.CultureInfo]::InvariantCulture,
-        [System.Globalization.DateTimeStyles]::AssumeUniversal,
-        [ref]$dt
-    )
-    if (-not $ok) { return $false }   # invalid format → fail
-    return ($dt -ge $Cutoff)
-}
-
-function Get-CoercedDate {
-    param(
-        [Parameter(Mandatory)]
-        [object]$InputDate,  # allow string or [datetime]
-
-        [datetime]$Cutoff = [datetime]'1000-01-01',
-
-        [ValidateSet('DD.MM.YYYY','YYYY.MM.DD','MM/DD/YYYY')]
-        [string]$OutputFormat = 'MM/DD/YYYY'
-    )
-
-    $Inv = [System.Globalization.CultureInfo]::InvariantCulture
-
-    # 1) If it's already a DateTime, trust it
-    if ($InputDate -is [datetime]) {
-        $dt = [datetime]$InputDate
-    }
-    else {
-        $text = "$InputDate".Trim()
-        if ([string]::IsNullOrWhiteSpace($text)) { return $null }
-
-        # 2) Try strict formats first via ParseExact
-        $formats = @(
-            'MM/dd/yyyy HH:mm:ss'
-            'MM/dd/yyyy hh:mm:ss tt'
-            'MM/dd/yyyy'
-        )
-
-        $dt   = $null
-        $ok   = $false
-
-        foreach ($fmt in $formats) {
-            try {
-                $dt = [System.DateTime]::ParseExact($text, $fmt, $Inv)
-                $ok = $true
-                break
-            } catch {
-                # ignore and try next format
-            }
-        }
-
-        # 3) Fallback: general Parse (handles lots of “normal” date strings)
-        if (-not $ok) {
-            try {
-                $dt = [System.DateTime]::Parse($text, $Inv)
-            } catch {
-                return $null
-            }
-        }
-    }
-
-    if ($dt -lt $Cutoff) { return $null }
-
-    switch ($OutputFormat) {
-        'DD.MM.YYYY' { $dt.ToString('dd.MM.yyyy', $Inv) }
-        'YYYY.MM.DD' { $dt.ToString('yyyy.MM.dd', $Inv) }
-        'MM/DD/YYYY' { $dt.ToString('MM/dd/yyyy', $Inv) }
-    }
-}
-
-function Get-NormalizedDropdownOptions {
-  param([Parameter(Mandatory)]$OptionsRaw)
-  $lines =
-    if ($null -eq $OptionsRaw) { @() }
-    elseif ($OptionsRaw -is [string]) { $OptionsRaw -split "`r?`n" }
-    elseif ($OptionsRaw -is [System.Collections.IEnumerable]) { @($OptionsRaw) }
-    else { @("$OptionsRaw") }
-
-  $seen = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
-  $out = New-Object System.Collections.Generic.List[string]
-  foreach ($l in $lines) {
-    $x = "$l".Trim()
-    if ($x -ne "" -and $seen.Add($x)) { $out.Add($x) }
-  }
-  if ($out.Count -eq 0) { @('None','N/A') } elseif ($out.Count -eq 1) { @('None',$out[0] ?? "N/A") } else { $out.ToArray() }
-}
-function Get-UniqueListName {
-  param([Parameter(Mandatory)][string]$BaseName,[bool]$allowReuse=$false)
-
-  $name = $BaseName.Trim()
-  $i = 0
-  while ($true) {
-    $existing = Get-HuduLists -name $name
-    if (-not $existing) { return $name }
-    if ($existing -and $true -eq $allowReuse) {return $existing}
-    $i++
-    $name = "{0}-{1}" -f $BaseName.Trim(), $i
-  }
+function Get-SimilaritySafe { param([string]$A,[string]$B)
+    if ([string]::IsNullOrWhiteSpace($A) -or [string]::IsNullOrWhiteSpace($B)) { return 0.0 }
+    $score = Get-Similarity $A $B
+    write-host "$A ... $B SCORED $score"
+    return $score
 }
 
 function Get-CastIfBoolean {
@@ -358,7 +282,7 @@ function Set-SmooshAssetFieldsToField {
         } else {$header = ""}
         $textToUse = ""
         if ("$($($sourceasset.fields | where-object {$_.label -eq $sourcefieldsmoosh}).value)" -ilike '*list_id*'){
-            $precastValue=$field.value;
+            $precastValue="$($($sourceasset.fields | where-object {$_.label -eq $sourcefieldsmoosh}).value)"
             $listItemId = $null; 
             $listItemId = $(SafeDecode "$($($sourceasset.fields | where-object {$_.label -eq $sourcefieldsmoosh}).value)").list_ids[0]
             $textToUse = $($(get-hudulists).list_items | where-object {$_.id -eq $listItemId} | select-object -first 1).name
@@ -427,113 +351,26 @@ function Get-SmooshedLinkableDescription {
     param (
         [array]$linkableObjects
     )
-
-    if (-not $linkableObjects -or $linkableObjects.Count -lt 1) {
+    $description=""
+    if (-not $linkableObjects -or $linkableObjects.count -lt 1) {
         return ""
     }
 
-    $description = ""
-
     foreach ($linkable in $linkableObjects) {
-        if ($linkable.LinkedAsset -and $linkable.LinkedLayout) {
-            $summary = "Related $($linkable.LinkedLayout.name) - $($linkable.LinkedAsset.name)"
-            if ($linkable.LinkedAsset.url) {
-                $descriptor = @"
+        if ($linkable.linkedasset.url){
+        $descriptor=@"
 <br><hr>
-<a href='$($linkable.LinkedAsset.url)'>$summary</a>
+<a href='$($linkable.linkedasset.url)'>Related $($linkable.LinkedLayout.name) - $($linkable.LinkedAsset.name)</a>
 "@
-            } else {
-                $descriptor = @"
-<br><hr>
-$summary
-"@
-            }
-        $description = "$description<br><hr>$descriptor"
-        }
+} else {
+        $descriptor=@"
+Related $($linkable.LinkedLayout.name) - $($linkable.LinkedAsset.name)
+"@    
     }
-
+    $description = "$description<br><hr>$descriptor"
+    }
     return $description
 }
-
-function Ensure-HuduListItemByName {
-    param(
-        [Parameter(Mandatory)][int]$ListId,
-        [Parameter(Mandatory)][string]$Name,
-        [hashtable]$listNameExistsByListId
-    )
-
-    $nameTrim = $Name.Trim()
-    $needle = $nameTrim.ToLowerInvariant()
-
-    if (-not $listNameExistsByListId.ContainsKey($ListId)) {
-        Refresh-ListCache
-    }
-
-    $map = $listNameExistsByListId[$ListId]
-    if ($map -and $map.ContainsKey($needle)) {
-        return $map[$needle]  # return canonical name as stored
-    }
-
-    # Add item to list
-    $list = Get-HuduLists -Id $ListId
-    $listName = $list.name
-
-    $items = @()
-    foreach ($existing in ($list.list_items ?? @())) {
-        $items += @{ id = [int]$existing.id; name = [string]$existing.name }
-    }
-    $items += @{ name = $nameTrim }
-
-    $null = Set-HuduList -Id $ListId -Name $listName -ListItems $items
-
-    # refresh cache and return
-    $listNameExistsByListId = Refresh-ListCache
-    $map = $listNameExistsByListId[$ListId]
-    if ($map.ContainsKey($needle)) { return $map[$needle] }
-
-    throw "Failed to add/list item '$Name' to list $ListId"
-}
-function Refresh-ListCache {
-    $listNameExistsByListId = @{}
-    foreach ($l in Get-HuduLists) {
-        $lid = [int]$l.id
-        $map = @{}
-        foreach ($it in ($l.list_items ?? @())) {
-            if ($it.name) {
-                $map[$it.name.ToString().Trim().ToLowerInvariant()] = [string]$it.name
-            }
-        }
-        $listNameExistsByListId[$lid] = $map
-    }
-    return $listNameExistsByListId
-}
-
-function SafeDecode {
-    [CmdletBinding()]
-    param (
-        [Parameter(Mandatory)]
-        [AllowNull()]
-        [object]$InputObject
-    )
-
-    if ($null -eq $InputObject) { return $null }
-
-    if ($InputObject -isnot [string]) {
-        return $InputObject
-    }
-
-    $s = $InputObject.Trim()
-    if ([string]::IsNullOrWhiteSpace($s)) { return $null }
-
-    try {
-        return $s | ConvertFrom-Json -ErrorAction Stop
-    } catch {
-        # Not valid JSON; just return the original string
-        return $InputObject
-    }
-}
-
-
 function Get-HuduModule {
     param (
         [string]$HAPImodulePath = "C:\Users\$env:USERNAME\Documents\GitHub\HuduAPI\HuduAPI\HuduAPI.psm1",
@@ -570,11 +407,10 @@ function Get-HuduModule {
 }
 
 function Set-HuduInstance {
-    $HuduBaseURL = $HuduBaseURL ?? 
-        $((Read-Host -Prompt 'Set the base domain of your Hudu instance (e.g https://myinstance.huducloud.com)') -replace '[\\/]+$', '') -replace '^(?!https://)', 'https://'
+    $HuduBaseURL = $HuduBaseURL ?? $((Read-Host -Prompt 'Set the base domain of your Hudu instance (e.g https://myinstance.huducloud.com)') -replace '[\\/]+$', '') -replace '^(?!https://)', 'https://'
     $HuduAPIKey = $HuduAPIKey ?? "$(read-host "Please Enter Hudu API Key")"
     while ($HuduAPIKey.Length -ne 24) {
-        $HuduAPIKey = (Read-Host -Prompt "Get a Hudu API Key from $(Get-HuduBaseUrl)/admin/api_keys").Trim()
+        $HuduAPIKey = (Read-Host -Prompt "Get a Hudu API Key from $($settings.HuduBaseDomain)/admin/api_keys").Trim()
         if ($HuduAPIKey.Length -ne 24) {
             Write-Host "This doesn't seem to be a valid Hudu API key. It is $($HuduAPIKey.Length) characters long, but should be 24." -ForegroundColor Red
         }
@@ -635,7 +471,7 @@ $excludeHTMLinSMOOSH = $false
 
 # include description of related objects in smoosh
 # related objects will have a 1-line description based on related object type and name
-$describeRelatedInSmoosh = $true
+$describeRelatedInSmoosh = $false
 
 # include label - above value in smooshed? IE - 
 # label -
@@ -742,6 +578,20 @@ function Select-ObjectFromList($objects, $message, $inspectObjects = $false, $al
         }
     }
 }
+function Get-UniqueListName {
+  param([Parameter(Mandatory)][string]$BaseName,[bool]$allowReuse=$false)
+
+  $name = $BaseName.Trim()
+  $i = 0
+  while ($true) {
+    $existing = Get-HuduLists -name $name
+    if (-not $existing) { return $name }
+    if ($existing -and $true -eq $allowReuse) {return $existing}
+    $i++
+    $name = "{0}-{1}" -f $BaseName.Trim(), $i
+  }
+}
+
 function Get-NormalizedDropdownOptions {
   param([Parameter(Mandatory)]$OptionsRaw)
   $lines =
@@ -1001,6 +851,32 @@ function Get-SourceListItemNameFieldFromID {
         return $RawValue
     }
 }
+function SafeDecode {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory)]
+        [AllowNull()]
+        [object]$InputObject
+    )
+
+    if ($null -eq $InputObject) { return $null }
+
+    if ($InputObject -isnot [string]) {
+        return $InputObject
+    }
+
+    $s = $InputObject.Trim()
+    if ([string]::IsNullOrWhiteSpace($s)) { return $null }
+
+    try {
+        return $s | ConvertFrom-Json -ErrorAction Stop
+    } catch {
+        # Not valid JSON; just return the original string
+        return $InputObject
+    }
+}
+
+
 function Set-MappedListSelectItemFromuserMapping {
     [OutputType([hashtable])]
     [CmdletBinding()]
@@ -1081,6 +957,223 @@ function Set-MappedListSelectItemFromuserMapping {
     # No match
     return $result
 }
+function Convert-FieldArrayToMap {
+    param([Parameter(Mandatory)][object[]]$FieldArray)
+
+    $map = @{}
+    foreach ($ht in $FieldArray) {
+        if ($ht -isnot [hashtable] -and $ht -isnot [System.Collections.IDictionary]) { continue }
+        foreach ($k in $ht.Keys) {
+            $map[$k] = $ht[$k]
+        }
+    }
+    return $map
+}
+
+function Merge-HuduFieldMaps {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][hashtable]$SourceMap,   # transformed/source
+        [Parameter(Mandatory)][hashtable]$DestMap,     # matched/dest existing
+        [Parameter(Mandatory)][object[]]$LayoutFields, # dest layout fields
+        [ValidateSet('Merge-FillBlanks','Merge-PreferSource','Merge-Concat')]
+        [string]$Mode = 'Merge-FillBlanks',
+
+        # For Merge-Concat: which field types should be concatenated?
+        [string[]]$ConcatTypes = @('RichText','Text', "Heading", "ConfidentialText","Password"),
+
+        # Separators
+        [string]$RichTextSeparator = "<br><hr>",
+        [string]$TextSeparator     = "`n`n---`n`n",
+
+        # Provenance stamping
+        [switch]$StampProvenance,
+        [string]$SourceStamp = "Imported (source)",
+        [string]$DestStamp   = "Existing (dest)"
+    )
+
+    $typeByLabel = Get-FieldTypeByLabel -LayoutFields $LayoutFields
+
+    $out = @{}
+
+    $labels = @($SourceMap.Keys + $DestMap.Keys) | Select-Object -Unique
+    foreach ($label in $labels) {
+        $listItemId = $null; $humanReadable = $null;
+        $src = $SourceMap[$label]
+        $dst = $DestMap[$label]
+        $srcBlank = Is-BlankValue $src
+        $dstBlank = Is-BlankValue $dst
+        # only fetched-dest will be in non-human format when list
+        if (-not $dstBlank -and $dst -ilike '*list_id*'){
+            try {
+                $listItemId = $(SafeDecode $dst).list_ids[0]
+                $humanReadable = $($(get-hudulists).list_items | where-object {$_.id -eq $listItemId} | select-object -first 1).name
+            } catch {
+                Write-Host "Error transforming list_id source value '$dst' — $_"
+            }
+            if (-not ([string]::IsNullOrWhiteSpace($humanReadable))) {
+                $dst = $humanReadable
+                write-host "existing dest value for '$label' is a list item ID ($listItemId), transformed to human-readable '$dst'"
+            }
+        }
+        
+
+        $fieldType = $typeByLabel[$label]
+        if (-not $fieldType) { $fieldType = 'Text' }
+
+        switch ($Mode) {
+
+            'Merge-FillBlanks' {
+                # dest wins unless blank
+                if (-not $dstBlank) {
+                    $out[$label] = $dst
+                } elseif (-not $srcBlank) {
+                    $out[$label] = $src
+                }
+            }
+
+            'Merge-PreferSource' {
+                # source wins unless blank
+                if (-not $srcBlank) {
+                    $out[$label] = $src
+                } elseif (-not $dstBlank) {
+                    $out[$label] = $dst
+                }
+            }
+
+            'Merge-Concat' {
+                $isConcat = $ConcatTypes -contains $fieldType
+
+                if (-not $isConcat) {
+                    # For non-concat field types, default to PreferSource (tweak if you prefer)
+                    if (-not $srcBlank) { $out[$label] = $src }
+                    elseif (-not $dstBlank) { $out[$label] = $dst }
+                    break
+                }
+
+                # Concat path (only when both present)
+                if (-not $srcBlank -and -not $dstBlank) {
+
+                    $sep = if ($fieldType -eq 'RichText') { $RichTextSeparator } else { $TextSeparator }
+
+                    if ($StampProvenance) {
+                        if ($fieldType -eq 'RichText') {
+                            $lhs = "<div><strong>$SourceStamp</strong></div>$src"
+                            $rhs = "<div><strong>$DestStamp</strong></div>$dst"
+                            $out[$label] = "$lhs$sep$rhs"
+                        } else {
+                            $lhs = "$SourceStamp`n$src"
+                            $rhs = "$DestStamp`n$dst"
+                            $out[$label] = "$lhs$sep$rhs"
+                        }
+                    } else {
+                        $out[$label] = ([string]$src) + $sep + ([string]$dst)
+                    }
+
+                } elseif (-not $srcBlank) {
+                    $out[$label] = $src
+                } elseif (-not $dstBlank) {
+                    $out[$label] = $dst
+                }
+            }
+        }
+    }
+
+    return $out
+}
+function FieldListToMap {
+    param([object[]]$FieldList)
+
+    $map = @{}
+    foreach ($ht in ($FieldList ?? @())) {
+        if ($ht -isnot [System.Collections.IDictionary]) { continue }
+        foreach ($k in $ht.Keys) {
+            $map[$k] = $ht[$k]   # last wins
+        }
+    }
+    $map
+}
+
+function MapToFieldList {
+    param(
+        [hashtable]$Map,
+        [object[]]$LayoutFields = $null  # optional for ordering
+    )
+
+    $out = @()
+
+    if ($LayoutFields) {
+        foreach ($lf in $LayoutFields) {
+            $label = $lf.label
+            if ($label -and $Map.ContainsKey($label)) {
+                $out += @{ $label = $Map[$label] }
+            }
+        }
+        # include any extras not in layout
+        foreach ($k in $Map.Keys | Where-Object { $_ -notin ($LayoutFields.label) }) {
+            $out += @{ $k = $Map[$k] }
+        }
+    } else {
+        foreach ($k in $Map.Keys) { $out += @{ $k = $Map[$k] } }
+    }
+
+    $out
+}
+
+
+function Ensure-HuduListItemByName {
+    param(
+        [Parameter(Mandatory)][int]$ListId,
+        [Parameter(Mandatory)][string]$Name,
+        [hashtable]$listNameExistsByListId
+    )
+
+    $nameTrim = $Name.Trim()
+    $needle = $nameTrim.ToLowerInvariant()
+
+    if (-not $listNameExistsByListId.ContainsKey($ListId)) {
+        Refresh-ListCache
+    }
+
+    $map = $listNameExistsByListId[$ListId]
+    if ($map -and $map.ContainsKey($needle)) {
+        return $map[$needle]  # return canonical name as stored
+    }
+
+    # Add item to list
+    $list = Get-HuduLists -Id $ListId
+    $listName = $list.name
+
+    $items = @()
+    foreach ($existing in ($list.list_items ?? @())) {
+        $items += @{ id = [int]$existing.id; name = [string]$existing.name }
+    }
+    $items += @{ name = $nameTrim }
+
+    $null = Set-HuduList -Id $ListId -Name $listName -ListItems $items
+
+    # refresh cache and return
+    $listNameExistsByListId = Refresh-ListCache
+    $map = $listNameExistsByListId[$ListId]
+    if ($map.ContainsKey($needle)) { return $map[$needle] }
+
+    throw "Failed to add/list item '$Name' to list $ListId"
+}
+function Refresh-ListCache {
+    $listNameExistsByListId = @{}
+    foreach ($l in Get-HuduLists) {
+        $lid = [int]$l.id
+        $map = @{}
+        foreach ($it in ($l.list_items ?? @())) {
+            if ($it.name) {
+                $map[$it.name.ToString().Trim().ToLowerInvariant()] = [string]$it.name
+            }
+        }
+        $listNameExistsByListId[$lid] = $map
+    }
+    return $listNameExistsByListId
+}
+
 function Write-ErrorObjectsToFile {
     param (
         [Parameter(Mandatory)]
@@ -1160,10 +1253,7 @@ $allrelations = $allrelations ?? $(Get-HuduRelations)
 write-host "adding/calculating addtitional properties for layouts"
 
 foreach ($layout in $assetlayouts) {$layout | Add-Member -NotePropertyName assetsInLayoutCount -NotePropertyValue $($allAssets | Where-Object {$_.asset_layout_id -eq $layout.id}).count -Force}
-# foreach ($layout in $assetlayouts | where-object {$_.assetsInLayoutCount -lt 1 -and $($_.active ?? $true)}) {
-#     write-host "archiving emtpy layout $($layout.name)"
-#     Set-HuduAssetLayout -id $layout.id -Active $false
-# }
+
 $assetlayouts=$assetlayouts # | where-object {$_.assetsInLayoutCount -gt 0}
 $assetlayouts = $assetlayouts | Sort-Object Name
 $usablelayouts = $assetlayouts.count
@@ -1171,12 +1261,16 @@ write-host "$($totallayouts - $usablelayouts) omitted and marked inactive. $tota
 $choice=Set-LayoutsForTransfer -allLayouts $assetlayouts
 $sourceassetlayout = $choice.SourceLayout
 $destassetlayout = $choice.DestLayout
+$MergeOnMatch = [bool]$("yes" -eq $(Select-ObjectFromList -message "if an asset in source layout $($sourceassetlayout.name) has a Name that matches a Name in dest layout $($destassetlayout.name), should we merge data from source into dest asset (yes) or do something else (no)?" -objects @("yes","no")))
+$SkipOnMatch = if ($MergeOnMatch -eq $true) {$false} else {[bool]$("yes" -eq $(Select-ObjectFromList -message "if an asset in source layout $($sourceassetlayout.name) has a Name that matches a Name in dest layout $($destassetlayout.name), should we skip adding source asset into dest (yes) or create both (no)?" -objects @("yes","no")))}
+$MergeMode = if ($MergeOnMatch -eq $true) {$(Select-Objectfromlist -message "which merge mode / approach for matching assets in destination?" -objects @('Merge-FillBlanks','Merge-PreferSource','Merge-Concat'))} else {$null}
+
+
 
 foreach ($layout in @($sourceassetlayout, $destassetlayout)){
     write-host "getting relinkable fields from layout $($layout.name)..."
     $layout | Add-Member -NotePropertyName linkables -NotePropertyValue $(Get-RelinkableAssetTagLayoutFields -fromLayoutId $layout.id) -Force
 }
-
 
 if ($(test-path "$mapfile")) {
     write-host "backed up $mapfile to $mapfile.old"; Move-Item $mapfile "$mapfile.old" -Force
@@ -1186,11 +1280,11 @@ if ($(test-path "$mapfile")) {
 $srcfields=@()
 $sourceListItemMap = @{}
 foreach ($field in $sourceassetlayout.fields | Where-Object {$_.field_type -ne "AssetTag"}) { # assettag fields are carried over as relationships
-    if ($field.field_type -eq "ListSelect" -and $null -ne $field.list_id){
+    if ($field.field_type -ieq "ListSelect" -and $null -ne $field.list_id){
         $typicalValues = $(Get-HuduLists -id $field.list_id).list_items ?? @()
         $sourceListItemMap["$($field.label)"]=$typicalValues.name
         $srcfields+=@{label = $field.label; field_type = $field.field_type; list_id=$field.list_id; typicalValues=$typicalValues; required = $($field.required ?? $false)}
-    } elseif ($field.field_type -eq 'DropDown' -and -not ([string]::IsNullOrEmpty($field.options))){
+    } elseif ($field.field_type -ieq 'DropDown' -and -not ([string]::IsNullOrEmpty($field.options))){
         $typicalValues = $(Get-NormalizedDropdownOptions $field.options) ?? @()
         $srcfields+=@{label = $field.label; field_type = $field.field_type; typicalValues=$typicalValues; required = $($field.required ?? $false)}
     } else {
@@ -1256,7 +1350,7 @@ foreach ($entry in $mapping) {
 }
 
 $mappingtosmooshed = [bool]$($SMOOSHLABELS.count -gt 0)
-$sourceassets = $($allAssets | Where-Object {$_.asset_layout_id -eq $sourceassetlayout.id}) 
+$sourceAssets = $($allAssets | Where-Object {$_.asset_layout_id -eq $sourceassetlayout.id}) 
 $destassets = $($allAssets | Where-Object {$_.asset_layout_id -eq $destassetlayout.id}) 
 if ($sourceassets.count -lt 1) { write-host "NO SOURCE ASSETS!"; exit}
 read-host "$($($addressMapsByDest.GetEnumerator()).count) Location Types in Target press enter to proceed"
@@ -1278,24 +1372,30 @@ read-host "$($sourceassets.count) source assets and $($destassets.count) dest as
 $sourceassetsIDX=0
 foreach ($originalasset in $sourceassets) {
     $sourceassetsIDX=$sourceassetsIDX+1
-    $linkableToAssetInfo = $null
+    $linkableToAssetInfo = $null; $NewAssetName = $originalasset.name; $matchedMap = $null; $match = $null; $newAsset = $null;
     write-host "matching existing assets to asset $sourceassetsIDX of $($sourceassets.count) in destination layout assets ($($destassets.count) total) to determine if overlap"
-    $match = $destassets | where-object {$_.company_id -eq $originalasset.company_id -and $_.name -like "*$($originalasset.name)*"} | Select-Object -First 1
-    if ($match -and $null -ne $match) {
-        $totalcounts.assetsmatched=$totalcounts.assetsmatched+1
-        write-host "match found in dest layout. (#$($totalcounts.assetsmatched)) thus far"
-        write-host "original: $($($originalasset | ConvertTo-Json -depth 6).ToString())" -ForegroundColor Yellow
-        write-host "match: $($($match | ConvertTo-Json -depth 6).ToString())" -ForegroundColor Blue
-        continue
-        $archiveChoice=$(select-objectfromlist -message "which action to take for match?" -objects @("archive match","move anyway, archive original","skip"))
-        if ($archiveChoice -eq "archive match") {
-            Set-HuduAssetArchive -CompanyId $originalasset.company_id -Id $originalasset.id -Archive $true
-            $totalcounts.assetsarchived=$totalcounts.assetsarchived+1
-        } elseif ($archiveChoice -eq "skip") {
-            $totalcounts.assetsskipped=$totalcounts.assetsskipped+1
-            continue
-        } else {write-host "archive after moving as usual"}
+    $match = $destassets | Where-Object { $_.company_id -eq $originalasset.company_id -and $_.name -ieq $originalasset.name } | Select-Object -First 1
+    if (-not $match -and $originalasset.name.length -gt 6) {
+        $match = $destassets | where-object {$_.company_id -eq $originalasset.company_id -and ($_.name -ilike "$($originalasset.name)*" -or $_.name -ilike "*$($originalasset.name)")} | Select-Object -First 1
     }
+    $match = $match.asset ?? $match
+    if ($match -and $null -ne $match -and $null -ne $match.fields) {
+        $totalcounts.assetsmatched=$totalcounts.assetsmatched+1
+        if ($true -eq $MergeOnMatch){
+            write-host "Matched existing asset '$($match.name)' (ID: $($match.id)) in destination layout for source asset '$($originalasset.name)' (ID: $($originalasset.id)) - will compile complete list of fields from both"
+            $matchedMap = FieldsToLabelValueMap $match.fields
+        } elseif ($true -eq $SkipOnMatch) {
+            write-host "match found in dest layout. (#$($totalcounts.assetsmatched)) thus far"
+            write-host "original: $($($originalasset | ConvertTo-Json -depth 6).ToString())" -ForegroundColor Yellow
+            write-host "match: $($($match | ConvertTo-Json -depth 6).ToString())" -ForegroundColor Blue
+            continue
+        } else {
+            write-host "match found in dest layout. (#$($totalcounts.assetsmatched)) thus far"
+            $NewAssetName = "$($originalasset.name) (from layout $($sourceassetlayout.name))"
+            write-host "overridding name -> $($NewAssetName) and keeping both per user-preference"
+        }
+    }
+
 
     $transformedFields = @()
     if ($CONSTANTS -and $CONSTANTS.count -gt 0) {
@@ -1328,6 +1428,7 @@ foreach ($originalasset in $sourceassets) {
             $listItemId = $null; 
             $listItemId = $(SafeDecode $field.value).list_ids[0]
             $humanValue = $($(get-hudulists).list_items | where-object {$_.id -eq $listItemId} | select-object -first 1).name
+
             $field.value = $humanValue
             Write-Host "non-empty source val appears to contain listIDs; Raw val '$($precastValue)' as $destFieldType... $($field.value)" -foregroundColor DarkCyan
         }
@@ -1345,9 +1446,7 @@ foreach ($originalasset in $sourceassets) {
             if ($true -eq $stripHTML) {
                 $field.value="$(Remove-HtmlTags -InputString "$($field.value)")"
             }
-            # if ($destFieldType -eq "Email" -or ($($destFieldType -eq "Text" -and $transformedlabel -like "*Email*"))){
-            #     $field.value="$(Get-CleansedEmailAddresses -InputString "$($field.value)")".Trim()
-            # }
+
             if ($destFieldType -eq "Number"){
                 $precastValue=$field.value; $field.value = $(Get-CastIfNumeric $field.value) ?? $(Get-CastIfNumeric $($field.value -replace '\D+', ''));
                 Write-Host "non-empty source val on Number target; Casting '$($precastValue)' as int...$($field.value)"
@@ -1360,8 +1459,8 @@ foreach ($originalasset in $sourceassets) {
             }
             $transformedFields += @{$transformedlabel = $field.value}
         } else {
+            if ([string]::IsNullOrWhiteSpace($field.value)){continue}
         # mapping for individual listitems
-            if ([string]::IsNullOrWhiteSpace($field.value)){continue}        
             $result = Set-MappedListSelectItemFromuserMapping `
                 -Mapping $mapping `
                 -RawValue $field.value `
@@ -1433,23 +1532,39 @@ foreach ($originalasset in $sourceassets) {
     }
 
     $newAssetRequest = @{
-        Name            = $originalasset.name
+        Name            = $NewAssetName ?? $originalasset.name
         CompanyId       = $originalasset.company_id
         AssetLayoutId   = $destassetlayout.id
     }
-     if ($transformedFields -and $transformedFields.count -gt 0){
+
+     if ($null -ne $matchedmap -and $matchedmap.count -gt 0){
+        write-host "Merging transformed fields with matched existing asset fields..."
+        $transformedMap = Convert-FieldArrayToMap $transformedFields 
+        $finalMap = Merge-HuduFieldMaps `
+            -SourceMap $transformedMap -DestMap $matchedMap -LayoutFields $destassetlayout.fields -Mode $mergeMode `
+            -StampProvenance:$true -SourceStamp "From $($sourceassetlayout.name) " -DestStamp   "Existing $($destassetlayout.name) "
+        $newAssetRequest["Fields"] = LabelValueMapToFields -Map $finalMap -LayoutFields $destassetlayout.fields
+        $newAssetRequest["Id"]     = $match.id
+    } elseif ($transformedFields -and $transformedFields.count -gt 0){
         $newAssetRequest["Fields"]=$transformedFields
         write-host $($($transformedFields | convertto-json -depth 5).ToString())
      }
+
+
+    # prepare any typical asset properties, falling back to a match if a match is present + configured for merge
     $propPairs = @(
         @{ Dest = 'PrimarySerial';       Source = 'primary_serial' }
         @{ Dest = 'PrimaryMail';         Source = 'primary_mail' }
         @{ Dest = 'PrimaryModel';        Source = 'primary_model' }
         @{ Dest = 'PrimaryManufacturer'; Source = 'primary_manufacturer' }
     )
-
     foreach ($pairing in $propPairs) {
-        $commonPropValue = $originalAsset.($pairing.Source)
+        if ($null -ne $matchedMap -and $matchedMap.count -gt 0){
+            write-host "using matched asset for fallback to common property $($pairing.Source) since merging on match is enabled"
+            $commonPropValue = $originalAsset.($pairing.Source) ?? $match.($pairing.Source)
+        } else {
+            $commonPropValue = $originalAsset.($pairing.Source)
+        }
         if (-not [string]::IsNullOrEmpty("$commonPropValue")) {
             Write-Host "using value $commonPropValue from source $($pairing.source)->$($pairing.dest)"
             $newAssetRequest[$pairing.Dest] = $commonPropValue
@@ -1457,10 +1572,32 @@ foreach ($originalasset in $sourceassets) {
             Write-Host "skipping empty value for common-property, $($pairing.source)"             
         }
     }
+    # update or create, depending on if we had a match or not
     try {
-        write-host "$($($newAssetRequest | ConvertTo-Json -depth 66).ToString())"
-        $newAsset = $(new-huduasset @newAssetRequest).asset
-        write-host "Created asset $($newAsset.id)"
+        if ($null -ne $newAssetRequest.id -and $newAssetRequest.id -gt 0){
+            write-host "$($($newAssetRequest | ConvertTo-Json -depth 66).ToString())"
+            $newAsset = $(set-huduasset @newAssetRequest)
+            $newAsset = $newAsset.asset ?? $newAsset
+            write-host "updated asset $($newAsset.id)"
+        } else {
+            write-host "$($($newAssetRequest | ConvertTo-Json -depth 66).ToString())"
+            $newAsset = $(new-huduasset @newAssetRequest)
+            $newAsset = $newAsset.asset ?? $newAsset
+            write-host "Created asset $($newAsset.id)"
+        }
+    } catch {
+        Write-ErrorObjectsToFile -ErrorObject @{Err=$_; request=$newAssetRequest} -Name "$($newAssetRequest.name)$(if ($null -ne $newAssetRequest.id -and $newAssetRequest.id -gt 0) {"-update-$($newAssetRequest.id)"} else {"-create"})"
+        continue
+    }
+
+    if (-not $newAsset -or $null -eq $newAsset) {
+        Write-ErrorObjectsToFile -ErrorObject $newAssetRequest -Name "NC-$($newAssetRequest.name)"
+        $totalcounts.errored=$totalcounts.errored+1
+        continue
+    }
+    if ($null -ne $newAssetRequest.id -and $newAssetRequest.id -gt 0){
+        write-host "updated asset $($newasset.id), no need to re-relate or archive items outside of previous asset-tags"
+    } else {
         # archive new asset if original was archived
         if ($originalasset.archived -eq $true) {
             Set-HuduAssetArchive -CompanyId $newAsset.company_id -Id $newAsset.id -Archive $true
@@ -1471,45 +1608,40 @@ foreach ($originalasset in $sourceassets) {
             Set-HuduAssetArchive -CompanyId $originalasset.company_id -Id $originalasset.id -Archive $true
             $totalcounts.assetsarchived=$totalcounts.assetsarchived+1
         }        
-
-    } catch {
-        Write-ErrorObjectsToFile -ErrorObject @{Err=$_; request=$newAssetRequest} -Name $newAssetRequest.name
-    }
-    if (-not $newAsset -or $null -eq $newAsset) {
-        Write-ErrorObjectsToFile -ErrorObject $newAssetRequest -Name "NC-$($newAssetRequest.name)"
-        $totalcounts.errored=$totalcounts.errored+1
-        continue
-    } else {
         $totalcounts.assetsmoved=$totalcounts.assetsmoved+1
-        write-host "created asset $($newasset.id)"
-    }
+        write-host "created asset $($newasset.id), adding relations now."
+        # add relations
 
-    # add relations
-    $sourceToables  = $($($allrelations | where-object {$_.toable_type -eq 'Asset' -and $originalasset.id -eq $_.toable_id }) ?? @())
-     write-host "$($sourceToables.count) toable relations"
-    $sourceFromables  = $($($allrelations | where-object {$_.fromable_type -eq 'Asset' -and $originalasset.id -eq $_.fromable_id }) ?? @())
-     write-host "$($sourceFromables.count) fromable relations"
-    try {
-        $relationsTo = $sourceToables | Where-Object { $_.toable_id -eq $sourceAsset.id }
+        $sourceToables  = $($($allrelations | where-object {$_.toable_type -eq 'Asset' -and $originalasset.id -eq $_.toable_id }) ?? @())
+        write-host "$($sourceToables.count) toable relations"
+        $sourceFromables  = $($($allrelations | where-object {$_.fromable_type -eq 'Asset' -and $originalasset.id -eq $_.fromable_id }) ?? @())
+        write-host "$($sourceFromables.count) fromable relations"
+        $relationsTo = $sourceToables | Where-Object { $_.toable_id -eq $originalasset.id }
+        
+        if (get-command -name Set-HapiErrorsDirectory -ErrorAction SilentlyContinue){try {Set-HapiErrorsDirectory -skipRetry $true} catch {}}
         foreach ($rel in $relationsTo) {
-            $newToable+=New-HuduRelation -FromableType $rel.fromable_type -FromableId $rel.fromable_id `
-                            -ToableType "Asset" -ToableId $newAsset.id
-            write-host "created toable rel $($newToable.id)"
-            $totalcounts.toablescreated= if ($newToable) {$totalcounts.toablescreated+1} else {$totalcounts.toablescreated}
+            try {
+                $newToable=New-HuduRelation -FromableType $rel.fromable_type -FromableId $rel.fromable_id -ToableType "Asset" -ToableId $newAsset.id
+                write-host "created toable rel $($newToable.id)"
+                $totalcounts.toablescreated= if ($newToable) {$totalcounts.toablescreated+1} else {$totalcounts.toablescreated}
+            } catch {
+                Write-ErrorObjectsToFile -ErrorObject @{Err= $_; From = $relationsFrom; To=$relationsTo} -Name "NCREL-TOABLE-$($newasset.name)"
+            }
         }
-        $relationsFrom = $sourceFromables | Where-Object { $_.fromable_id -eq $sourceAsset.id }
+        $relationsFrom = $sourceFromables | Where-Object { $_.fromable_id -eq $originalasset.id }
         foreach ($rel in $relationsFrom) {
-            $newFromable=New-HuduRelation -FromableType "Asset" -FromableId $newAsset.id `
-                            -ToableType $rel.toable_type -ToableId $rel.toable_id
-            write-host "created fromable rel $($newFromable.id)"
-            $totalcounts.fromablescreated= if ($newFromable) {$totalcounts.fromablescreated+1} else {$totalcounts.fromablescreated}
+            try {
+                $newFromable=New-HuduRelation -FromableType "Asset" -FromableId $newAsset.id -ToableType $rel.toable_type -ToableId $rel.toable_id
+                write-host "created fromable rel $($newFromable.id)"
+                $totalcounts.fromablescreated= if ($newFromable) {$totalcounts.fromablescreated+1} else {$totalcounts.fromablescreated}
+            } catch {
+                Write-ErrorObjectsToFile -ErrorObject @{Err= $_; From = $relationsFrom; To=$relationsTo} -Name "NCREL-FROMABLE-$($newasset.name)"
+            }            
         }
-    } catch {
-        $totalcounts.errored=$totalcounts.errored+1
-        Write-ErrorObjectsToFile -ErrorObject @{Err= $_; From = $relationsFrom; To=$relationsTo} -Name "NCREL-$($newasset.name)"
     }
-
+    # add assettag linking regardless of match/merge or made assets
     if ($linkableToAssetInfo -and $linkableToAssetInfo.count -gt 0){
+        if (get-command -name Set-HapiErrorsDirectory -ErrorAction SilentlyContinue){try {Set-HapiErrorsDirectory -skipRetry $true} catch {}}
         write-host "Asset has external asset links, relinking $($linkableToAssetInfo.count) for $($originalasset.name)"
         foreach ($linkableToAsset in $linkableToAssetInfo) {
             $linkedAsset=$linkableToAsset.LinkedAsset
@@ -1524,29 +1656,23 @@ foreach ($originalasset in $sourceassets) {
             }
         }
     }
-
-
+    if (get-command -name Set-HapiErrorsDirectory -ErrorAction SilentlyContinue){try {Set-HapiErrorsDirectory -skipRetry $false} catch {}}
 }
-Write-host "wrap-up"
+Write-host "wrap-up" -ForegroundColor cyan
 $newlayoutname = $null
 if ("yes" -eq $(Select-ObjectFromList -objects @("yes","no") -message "would you like to rename source layout ($($sourceassetlayout.name))" -allowNull $false)){
     $newlayoutname = read-host "what is the new name for $($sourceassetlayout.name)"
 }
 if ([string]::IsNullOrWhiteSpace($newlayoutname)) {$newlayoutname = $sourceassetlayout.name}
-
-if ("yes" -eq $(Select-ObjectFromList -objects @("yes","no") -message "would you like to archive source layout ($($sourceassetlayout.name))" -allowNull $false)){
-    $setsourcelayoutarchived = $true
-}
 if ("yes" -eq $(Select-ObjectFromList -objects @("yes","no") -message "would you like to archive source layout's assets? ($($sourceassets.count) total)" -allowNull $false)){
     $setsourceassetsarchived = $true
 }
-
-if ($newlayoutname -ne $sourceassetlayout.name -or $true -eq $setsourcelayoutarchived){
-    Set-HuduAssetLayout -id $sourceassetlayout.id -Name $newlayoutname -Active $false
+if ($newlayoutname -ne $sourceassetlayout.name){
+    Set-HuduAssetLayout -id $sourceassetlayout.id -Name $newlayoutname
 }
 if ($true -eq $setsourceassetsarchived) {
     foreach ($originalasset in $sourceassets) {
-        $result=Set-HuduAssetArchive -id $assetarch.id -CompanyId $assetarch.company_id -archive $true
+        $result=Set-HuduAssetArchive -id $originalasset.id -CompanyId $originalasset.company_id -archive $true
         $totalcounts.assetsarchived=$(if ($result) {$totalcounts.assetsarchived+1} else {$totalcounts.assetsarchived})
     }
 }

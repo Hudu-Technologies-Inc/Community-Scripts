@@ -65,6 +65,101 @@ Migrate assets between **Hudu** layouts while flexibly mapping fields, concatena
 
 ---
 
+## Matching Items in Destination
+
+When moving assets into a destination layout, the tool attempts to detect whether a source asset already exists in the destination. This helps avoid accidental duplicates and gives you control over how overlapping assets are handled.
+
+### How a Match Is Determined
+An asset in the source layout is considered a **match** to an asset in the destination layout when **both** of the following are true:
+
+- The source and destination assets belong to the **same company**, and
+- One of these name conditions applies:
+  - The names are exactly the same, **or**
+  - The destination asset’s name starts with or ends with the source asset’s name (only when the source name is longer than 6 characters)
+
+> The minimum character length prevents very short or generic names from being matched too aggressively.
+
+Matches most commonly occur when different layouts describe the **same real-world object** in different ways (for example, a server represented once as a configuration item and once as a general asset).
+
+---
+
+### What Happens When a Match Is Found
+When a match is detected, you’ll be prompted to choose how to proceed. The behavior depends on your answers.
+
+#### Option A: Do **Not** Merge on Match
+If you answer **No** to the initial merge prompt, you are choosing not to combine the source and destination assets. You’ll then be asked what to do next:
+
+- **Skip moving the source asset** — the destination asset is left unchanged, and the source asset is ignored
+- **Keep both assets** — the source asset is copied into the destination layout, typically with a modified name so both can coexist
+
+This was the original default behavior, but it’s generally less desirable when both assets describe the same thing.
+
+**Example:**
+If you are moving a *Config-Server* asset into a *Server Assets* layout and both already describe the same server:
+- You can skip moving the source asset, or
+- You can keep both assets with slightly different names
+
+---
+
+#### Option B: Merge on Match (Recommended)
+If you answer **Yes** to merging on match, the tool will **combine information** from the source and destination assets instead of treating them as separate objects.
+
+This is especially useful when consolidating layouts that describe the same physical or logical resources in different ways.
+
+**Example:**
+If *Config-Server* and *Server Assets* both describe the same machine, merging allows you to retain and unify information from both representations rather than choosing one and discarding the other.
+
+After choosing to merge, you’ll be prompted to select a **merge strategy** that determines how individual field values are combined.
+
+There are three merge modes you can choose from if you don't want to skip matches in destination:
+
+<img width="2168" height="240" alt="image" src="https://github.com/user-attachments/assets/1d4a5018-3e47-4721-8cbc-e8fc7b0d4a4b" />
+
+- Merge-FillBlanks (destination wins, source fills gaps)
+    - Use this when the destination asset is the “source of truth” and you only want to backfill missing fields.
+
+```
+┌─────────┐      ┌─────────┐
+│ ■ ■ □   │      │ ■ □ ■   │
+└─────────┘      └─────────┘
+        │            │
+        └──────┬─────┘
+               ▼
+        ┌─────────┐
+        │ ■ ■ ■   │
+        └─────────┘
+```
+
+- Merge-PreferSource (source wins, destination is fallback)
+    - Use this when the incoming/source asset is considered more correct or more up-to-date, but you still want to retain destination values when the source doesn’t have anything.
+
+```
+┌─────────┐      ┌─────────┐
+│ ■ ■ □   │      │ □ ■ ■   │
+└─────────┘      └─────────┘
+        │            │
+        └──────┬─────┘
+               ▼
+        ┌─────────┐
+        │ ■ ■ ■   │
+        └─────────┘
+```
+
+- Merge-Concat (keep both/append for text-like fields, choose winner for others)
+    - Use this when you don’t want to lose either side’s content for “notes” or text fields. For text-like field types (e.g. RichText/Text/Heading/Confidentialtext/Password), it concatenates source + destination with separators, adding provenance stamps to show which info came from where.
+
+```
+┌─────────┐      ┌─────────┐
+│ ■ ■ ■   │      │ ■ ■ ■   │
+└─────────┘      └─────────┘
+        │            │
+        └──────┬─────┘
+               ▼
+        ┌───────────────┐
+        │ ■ ■ ■ ▌ ■ ■ ■ │
+        └───────────────┘
+```
+
 ## The Mapping File (`mapping.ps1`)
 
 The script generates `mapping.ps1` with placeholders you can fill. It contains three key blocks:
@@ -286,3 +381,7 @@ $includeLabelInSmooshedValues = $true
 
 ## Changelog
 - **v0.3** – Initial public draft of SwitchingLayouts.MD, 19, Nov 2025
+
+## Changelog
+- **v0.5** – Addition of merge-on-match options
+23, Feb, 2026
