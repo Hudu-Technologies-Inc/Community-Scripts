@@ -175,6 +175,8 @@ $CONSTANTS = @(
 
 **Behavior:** For each entry, the destination field named in `to_label` receives `literal`.
 
+#### TIP - You can map constants as a 'fallback' for fields that are required (and may be empty in source asset)
+
 ---
 
 ### 2) `$SMOOSHLABELS`
