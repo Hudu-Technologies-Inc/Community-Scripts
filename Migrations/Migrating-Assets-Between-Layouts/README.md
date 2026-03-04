@@ -175,6 +175,8 @@ $CONSTANTS = @(
 
 **Behavior:** For each entry, the destination field named in `to_label` receives `literal`.
 
+#### TIP - You can map constants as a 'fallback' for fields that are required (and may be empty in source asset)
+
 ---
 
 ### 2) `$SMOOSHLABELS`
@@ -382,6 +384,8 @@ $includeLabelInSmooshedValues = $true
 ## Changelog
 - **v0.3** – Initial public draft of SwitchingLayouts.MD, 19, Nov 2025
 
-## Changelog
 - **v0.5** – Addition of merge-on-match options
 23, Feb, 2026
+
+- **v0.6** – Constants allowed as fallback value + combinatory relations on match
+5, Mar, 2026
