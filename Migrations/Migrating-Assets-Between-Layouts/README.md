@@ -55,7 +55,7 @@ For best results, use a full-permission API key rather than a narrowly scoped co
 
 Run `HuduAssetLayoutTransfer.exe`.
 
-<img width="404" height="169" alt="Launch screen" src="https://github.com/user-attachments/assets/732b0873-4c1c-42f2-b202-5cc362bdd6f8" />
+<img width="808" height="338" alt="image" src="https://github.com/user-attachments/assets/3d783a2e-bfd0-4428-99fd-e7c8d5cec0a2" />
 
 The tool opens a GUI window and a terminal window. The terminal is mainly there for logging and troubleshooting.
 
@@ -63,39 +63,39 @@ The tool opens a GUI window and a terminal window. The terminal is mainly there 
 
 Provide your Hudu URL and API key.
 
-<img width="399" height="170" alt="Connection prompt" src="https://github.com/user-attachments/assets/32d62e27-dde5-4957-897c-5c7c6a9628e9" />
+<img width="798" height="340" alt="image" src="https://github.com/user-attachments/assets/01cbb8ba-ee21-4e31-b542-7b121ac1a33f" />
 
 ### 3. Choose the source and destination layouts
 
 Pick the layout you are moving **from** and the layout you are moving **to**.
 
-<img width="407" height="225" alt="Layout selection" src="https://github.com/user-attachments/assets/8a282b31-2e1a-4cab-b528-111e659e2535" />
+<img width="814" height="450" alt="image" src="https://github.com/user-attachments/assets/52fd730b-1e25-4216-ac4f-f00b312c597c" />
 
 You will then get a confirmation step to review or change the selection.
 
-<img width="404" height="222" alt="Layout confirmation" src="https://github.com/user-attachments/assets/1f9f49c9-8eed-44c1-98fe-9d9212af795a" />
+<img width="808" height="444" alt="image" src="https://github.com/user-attachments/assets/73eafd51-fd87-4d85-bf29-f416db2b21a6" />
 
 ### 4. Choose merge behavior for matches
 
 If an incoming source asset appears to match an existing destination asset, you can choose how the tool should behave.
 
-<img width="402" height="276" alt="Merge preference prompt" src="https://github.com/user-attachments/assets/ec02e343-5344-4345-bf98-a83c6c805383" />
+<img width="804" height="552" alt="image" src="https://github.com/user-attachments/assets/9346a982-5838-4ffd-a7c1-26487e252621" />
 
 You can also optionally rename the source layout after the transfer is complete.
 
-<img width="407" height="184" alt="Rename source layout prompt" src="https://github.com/user-attachments/assets/4308241e-6b80-4eb1-8e23-aae3a40ba08a" />
+<img width="814" height="368" alt="image" src="https://github.com/user-attachments/assets/0423cd7f-25c4-4231-b881-8948ed7a211f" />
 
 ### 5. Decide whether to archive the original source assets
 
 This is usually recommended once you are confident the transfer plan is correct.
 
-<img width="414" height="161" alt="Archive prompt" src="https://github.com/user-attachments/assets/9cc22c06-0f08-44fa-bf67-d577fc459c51" />
+<img width="828" height="322" alt="image" src="https://github.com/user-attachments/assets/568e9eca-4336-4b0d-8263-ef4f9c55269a" />
 
 ### 6. Review field mappings
 
 If the source and destination layouts already line up closely, the tool may offer a direct transfer path.
 
-<img width="904" height="158" alt="Direct transfer prompt" src="https://github.com/user-attachments/assets/f10aadba-25c0-4ab2-8669-29499d0577f6" />
+<img width="1808" height="316" alt="image" src="https://github.com/user-attachments/assets/766bcb25-89b2-44ca-bdc8-17bf273cc9fd" />
 
 Otherwise, you will work through the field mapping wizard one destination field at a time.
 
@@ -137,7 +137,7 @@ Use `Back` and `Next` to move through the review loop. `Back` discards any in-pr
 
 This is the most common path: pick a source field and optionally enable `Strip HTML`.
 
-<img width="677" height="622" alt="Standard source mapping" src="https://github.com/user-attachments/assets/89487473-75f9-4cad-9cd8-98506d3d916e" />
+<img width="1046" height="697" alt="image" src="https://github.com/user-attachments/assets/b29c33d0-287e-4b3a-a353-b5efcb05a5b6" />
 
 Use `Strip HTML` when moving from rich text or embed-like source fields into plain text destination fields.
 
@@ -145,7 +145,8 @@ Use `Strip HTML` when moving from rich text or embed-like source fields into pla
 
 Use this when a destination field should always receive the same value.
 
-<img width="650" height="300" alt="Constant mapping" src="https://github.com/user-attachments/assets/407175b1-2ca3-4ba2-8d30-eff61b7045b0" />
+<img width="1035" height="687" alt="image" src="https://github.com/user-attachments/assets/c28599a7-0de2-4fb3-b3fc-c8db54518800" />
+
 
 This is especially useful for required destination fields that have no good source equivalent.
 
@@ -153,7 +154,7 @@ This is especially useful for required destination fields that have no good sour
 
 For `ListSelect` destination fields, choose a source field and define which source values should map to which destination list items.
 
-<img width="658" height="345" alt="ListSelect mapping" src="https://github.com/user-attachments/assets/8022ecd1-6761-4461-8a32-5cd1f665b021" />
+<img width="1316" height="690" alt="image" src="https://github.com/user-attachments/assets/5577c8a1-ea53-4aef-bac2-80bf68dcb422" />
 
 This is helpful when the source data is inconsistent and needs to be normalized into one controlled list.
 
@@ -183,7 +184,8 @@ The tool builds the destination address object only when at least one address co
 
 `SMOOSH` lets you combine multiple source fields into one destination field. It is usually most useful for `RichText`, `Heading`, or other notes-style destinations.
 
-<img width="684" height="630" alt="SMOOSH mapping" src="https://github.com/user-attachments/assets/6f5f6dc6-9441-494d-b40e-9cfbe2dd419f" />
+<img width="1368" height="1260" alt="image" src="https://github.com/user-attachments/assets/f05ba500-0c23-4921-bb7f-8d640e0695df" />
+
 
 Example rich text output:
 
