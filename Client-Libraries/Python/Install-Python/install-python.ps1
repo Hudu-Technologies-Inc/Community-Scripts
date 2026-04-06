@@ -5,6 +5,14 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+# When this script is streamed into Invoke-Expression, $PSScriptRoot is empty.
+# Fall back to the caller's current directory so .venv is created where the user runs it.
+$ScriptRoot = if ([string]::IsNullOrWhiteSpace($PSScriptRoot)) {
+    (Get-Location).ProviderPath
+} else {
+    $PSScriptRoot
+}
+
 function Get-PythonCommand {
     $candidates = @()
 
@@ -29,6 +37,19 @@ function Get-PythonCommand {
     return $null
 }
 
+function Invoke-NativeCommand {
+    param(
+        [Parameter(Mandatory)][scriptblock]$Script,
+        [Parameter(Mandatory)][string]$ErrorMessage
+    )
+
+    & $Script
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "$ErrorMessage Exit code: $LASTEXITCODE"
+    }
+}
+
 function Ensure-Python {
     $python = Get-PythonCommand
     if ($python) {
@@ -36,7 +57,9 @@ function Ensure-Python {
     }
 
     Write-Host "Python not found. Installing Python 3.14 with winget..." -ForegroundColor Yellow
-    winget install -e --id Python.Python.3.14
+    Invoke-NativeCommand -ErrorMessage "winget failed to install Python 3.14." {
+        winget install -e --id Python.Python.3.14
+    }
 
     $python = Get-PythonCommand
     if (-not $python) {
@@ -60,28 +83,36 @@ function Invoke-Step {
 }
 
 $PythonCmd = Ensure-Python
-$VenvPython = Join-Path $PSScriptRoot ".venv\Scripts\python.exe"
+$VenvPython = Join-Path $ScriptRoot ".venv\Scripts\python.exe"
 
-if ($ForceRecreateVenv -and (Test-Path (Join-Path $PSScriptRoot ".venv"))) {
+if ($ForceRecreateVenv -and (Test-Path (Join-Path $ScriptRoot ".venv"))) {
     Invoke-Step "Removing existing virtual environment" {
-        Remove-Item -Recurse -Force (Join-Path $PSScriptRoot ".venv")
+        Remove-Item -Recurse -Force (Join-Path $ScriptRoot ".venv")
     }
 }
 
 if (-not (Test-Path $VenvPython)) {
     Invoke-Step "Creating virtual environment" {
-        & $PythonCmd -m venv (Join-Path $PSScriptRoot ".venv")
+        Invoke-NativeCommand -ErrorMessage "Python failed to create the virtual environment." {
+            & $PythonCmd -m venv (Join-Path $ScriptRoot ".venv")
+        }
     }
 }
 
-$VenvPython = Join-Path $PSScriptRoot ".venv\Scripts\python.exe"
+$VenvPython = Join-Path $ScriptRoot ".venv\Scripts\python.exe"
+
+if (-not (Test-Path $VenvPython)) {
+    throw "Virtual environment creation did not produce $VenvPython"
+}
 
 Invoke-Step "Upgrading pip" {
-    & $VenvPython -m pip install --upgrade pip --no-cache-dir
+    Invoke-NativeCommand -ErrorMessage "pip failed to upgrade inside the virtual environment." {
+        & $VenvPython -m pip install --upgrade pip --no-cache-dir
+    }
 }
 
 Write-Host "Installed Python at $(Get-PythonCommand)" -ForegroundColor Green
 Write-Host "Created Venv $VenvPython"
 Write-Host "pip has been upgraded in virtual environment"
 Write-Host "Activate your virtual environment any time later with:" -ForegroundColor Green
-Write-Host ". $PSScriptRoot\.venv\Scripts\Activate.ps1"
+Write-Host ". $ScriptRoot\.venv\Scripts\Activate.ps1"
