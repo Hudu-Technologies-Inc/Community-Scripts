@@ -8,3 +8,4 @@
 **For Help Installing Python, See [Install-Python](Install-Python/)**
 
 - [Hudu-Magic Hudu API Client](Hudu-Magic/)
+  - [Hudu-Magic Examples](Hudu-Magic/Examples)
