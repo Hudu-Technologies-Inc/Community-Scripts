@@ -18,9 +18,11 @@ Collection of Hudu Community Scripts for anyone to use/run/remix/reference.
   - [Auditing Various Items In Hudu](Administration/Auditing-Items)
 
 - **Client Libraries**
-  - PowerShell
+  - [Python](Client-Libraries/Python/)
+    - [hudu-magic](Client-Libraries/Python/Hudu-Magic)
+  - [PowerShell](Client-Libraries/PowerShell/)
     - [HuduAPI](https://github.com/Hudu-Technologies-Inc/HuduAPI/blob/master/README.md)
-    - [Articles-From-Anything](Client-Libraries/Articles-From-Anything/)
+    - [Articles-From-Anything](Client-Libraries/Powershell/Articles-From-Anything/)
 
 - **Information and Visualization**
   - [Endpoint Self-Reporting](Information-and-Visualization/Endpoint-Self-Reporting/)
