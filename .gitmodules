@@ -31,6 +31,3 @@
 [submodule "Migrations/Itportal-Hudu-Migration"]
 	path = Migrations/Itportal-Hudu-Migration
 	url = https://github.com/Hudu-Technologies-Inc/ITPortal-Hudu-Migration.git
-[submodule "Client-Libraries/Python/Hudu-Magic"]
-	path = Client-Libraries/Python/Hudu-Magic
-	url = https://github.com/Hudu-Technologies-Inc/hudu-magic.git
