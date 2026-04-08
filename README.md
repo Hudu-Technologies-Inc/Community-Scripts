@@ -19,7 +19,7 @@ Collection of Hudu Community Scripts for anyone to use/run/remix/reference.
 
 - **Client Libraries**
   - [Python](Client-Libraries/Python/)
-    - [hudu-magic](Client-Libraries/Python/Hudu-Magic)
+    - [Hudu-Magic](https://github.com/Hudu-Technologies-Inc/hudu-magic)
   - [PowerShell](Client-Libraries/PowerShell/)
     - [HuduAPI](https://github.com/Hudu-Technologies-Inc/HuduAPI/blob/master/README.md)
     - [Articles-From-Anything](Client-Libraries/Powershell/Articles-From-Anything/)
