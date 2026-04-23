@@ -25,12 +25,16 @@
 [submodule "Migrations/Files-Hudu-Migration"]
 	path = Migrations/Files-Hudu-Migration
 	url = https://github.com/Hudu-Technologies-Inc/Files-Hudu-Migration.git
+    branch = main
 [submodule "Migrations/ITBoost-Hudu-Migration"]
 	path = Migrations/ITBoost-Hudu-Migration
 	url = https://github.com/Hudu-Technologies-Inc/ITBoost-Hudu-Migration.git
+    branch = main
 [submodule "Migrations/Itportal-Hudu-Migration"]
 	path = Migrations/Itportal-Hudu-Migration
 	url = https://github.com/Hudu-Technologies-Inc/ITPortal-Hudu-Migration.git
+    branch = main
 [submodule "Client-Libraries/Python/Hudu-Magic"]
 	path = Client-Libraries/Python/Hudu-Magic
 	url = git@github.com:Hudu-Technologies-Inc/hudu-magic.git
+    branch = main
