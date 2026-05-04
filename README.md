@@ -22,7 +22,7 @@ Collection of Hudu Community Scripts for anyone to use/run/remix/reference.
     - [Hudu-Magic](https://github.com/Hudu-Technologies-Inc/hudu-magic)
   - [PowerShell](Client-Libraries/PowerShell/)
     - [HuduAPI](https://github.com/Hudu-Technologies-Inc/HuduAPI/blob/master/README.md)
-    - [Articles-From-Anything](Client-Libraries/Powershell/Articles-From-Anything/)
+    - [Articles-From-Anything](https://github.com/Hudu-Technologies-Inc/Community-Scripts/tree/main/Client-Libraries/PowerShell/Articles-From-Anything)
 
 - **Information and Visualization**
   - [Endpoint Self-Reporting](Information-and-Visualization/Endpoint-Self-Reporting/)
