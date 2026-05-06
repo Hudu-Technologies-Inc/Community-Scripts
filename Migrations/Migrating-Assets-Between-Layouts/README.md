@@ -55,7 +55,7 @@ For best results, use a full-permission API key rather than a narrowly scoped co
 
 Run `HuduAssetLayoutTransfer.exe`.
 
-<img width="808" height="338" alt="image" src="https://github.com/user-attachments/assets/3d783a2e-bfd0-4428-99fd-e7c8d5cec0a2" />
+<img width="404" height="169" alt="Launch screen" src="https://github.com/user-attachments/assets/732b0873-4c1c-42f2-b202-5cc362bdd6f8" />
 
 The tool opens a GUI window and a terminal window. The terminal is mainly there for logging and troubleshooting.
 
@@ -63,39 +63,48 @@ The tool opens a GUI window and a terminal window. The terminal is mainly there 
 
 Provide your Hudu URL and API key.
 
-<img width="798" height="340" alt="image" src="https://github.com/user-attachments/assets/01cbb8ba-ee21-4e31-b542-7b121ac1a33f" />
+<img width="399" height="170" alt="Connection prompt" src="https://github.com/user-attachments/assets/32d62e27-dde5-4957-897c-5c7c6a9628e9" />
 
-### 3. Choose the source and destination layouts
+### 3. Choose the source and destination layouts, source-archival strategy, and merge-strategy
 
 Pick the layout you are moving **from** and the layout you are moving **to**.
 
-<img width="814" height="450" alt="image" src="https://github.com/user-attachments/assets/52fd730b-1e25-4216-ac4f-f00b312c597c" />
+<img width="1602" height="496" alt="image" src="https://github.com/user-attachments/assets/ddc48c70-ad21-4597-8709-c1ea0abd58bc" />
+
+If you are confident with your source/dest selection, it's generally a good idea to archive source data afterwards.
+
+
+### 4-A Match, Merge, Archive, and Match-Concatenation strategies (when source asset matched to destination)
 
 You will then get a confirmation step to review or change the selection.
 
-<img width="808" height="444" alt="image" src="https://github.com/user-attachments/assets/73eafd51-fd87-4d85-bf29-f416db2b21a6" />
+<img width="1482" height="700" alt="image" src="https://github.com/user-attachments/assets/b30274f3-a28c-46a7-ae1c-13fc99cc1cf4" />
 
-### 4. Choose merge behavior for matches
 
 If an incoming source asset appears to match an existing destination asset, you can choose how the tool should behave.
 
-<img width="804" height="552" alt="image" src="https://github.com/user-attachments/assets/9346a982-5838-4ffd-a7c1-26487e252621" />
+### 4-B (optional) filtering
 
-You can also optionally rename the source layout after the transfer is complete.
+If you would like to filter the source assets you are enqueueing, you can do so by selecting a field to select for an a value to match on. 
+You can match on any source field and any source field type. Dates, ListSelects, Text, etc.
 
-<img width="814" height="368" alt="image" src="https://github.com/user-attachments/assets/0423cd7f-25c4-4231-b881-8948ed7a211f" />
+The form will hint the number of assets that fall under your chosen filter.
 
-### 5. Decide whether to archive the original source assets
+<img width="1520" height="724" alt="image" src="https://github.com/user-attachments/assets/e7d3048a-11cd-42dc-804d-7d47d67f33c9" />
 
-This is usually recommended once you are confident the transfer plan is correct.
+### 4-C Set final strategies for fields, 'smoosh' application, and relations
 
-<img width="828" height="322" alt="image" src="https://github.com/user-attachments/assets/568e9eca-4336-4b0d-8263-ef4f9c55269a" />
+<img width="1610" height="738" alt="image" src="https://github.com/user-attachments/assets/f6c78814-8de0-45dd-995c-34daff613167" />
 
-### 6. Review field mappings
+pretty straightforward, Including blank values in smoosh and keeping HTML intact is usually not desirable [depending on circumstances] and will be disabled if no smoosh source/target was selected. 
+
+Including relations for archived objects is also generally good to do.
+
+### 5. Review field mappings
 
 If the source and destination layouts already line up closely, the tool may offer a direct transfer path.
 
-<img width="1808" height="316" alt="image" src="https://github.com/user-attachments/assets/766bcb25-89b2-44ca-bdc8-17bf273cc9fd" />
+<img width="904" height="158" alt="Direct transfer prompt" src="https://github.com/user-attachments/assets/f10aadba-25c0-4ab2-8669-29499d0577f6" />
 
 Otherwise, you will work through the field mapping wizard one destination field at a time.
 
@@ -137,7 +146,7 @@ Use `Back` and `Next` to move through the review loop. `Back` discards any in-pr
 
 This is the most common path: pick a source field and optionally enable `Strip HTML`.
 
-<img width="1046" height="697" alt="image" src="https://github.com/user-attachments/assets/b29c33d0-287e-4b3a-a353-b5efcb05a5b6" />
+<img width="677" height="622" alt="Standard source mapping" src="https://github.com/user-attachments/assets/89487473-75f9-4cad-9cd8-98506d3d916e" />
 
 Use `Strip HTML` when moving from rich text or embed-like source fields into plain text destination fields.
 
@@ -145,8 +154,7 @@ Use `Strip HTML` when moving from rich text or embed-like source fields into pla
 
 Use this when a destination field should always receive the same value.
 
-<img width="1035" height="687" alt="image" src="https://github.com/user-attachments/assets/c28599a7-0de2-4fb3-b3fc-c8db54518800" />
-
+<img width="650" height="300" alt="Constant mapping" src="https://github.com/user-attachments/assets/407175b1-2ca3-4ba2-8d30-eff61b7045b0" />
 
 This is especially useful for required destination fields that have no good source equivalent.
 
@@ -154,7 +162,14 @@ This is especially useful for required destination fields that have no good sour
 
 For `ListSelect` destination fields, choose a source field and define which source values should map to which destination list items.
 
-<img width="1316" height="690" alt="image" src="https://github.com/user-attachments/assets/5577c8a1-ea53-4aef-bac2-80bf68dcb422" />
+##### ListMapping Examples
+
+<img width="658" height="345" alt="ListSelect mapping" src="https://github.com/user-attachments/assets/8022ecd1-6761-4461-8a32-5cd1f665b021" />
+
+---
+
+<img width="2104" height="1410" alt="image" src="https://github.com/user-attachments/assets/987c0ba5-80ed-4d96-8b78-0a2c9e018831" />
+
 
 This is helpful when the source data is inconsistent and needs to be normalized into one controlled list.
 
@@ -184,8 +199,7 @@ The tool builds the destination address object only when at least one address co
 
 `SMOOSH` lets you combine multiple source fields into one destination field. It is usually most useful for `RichText`, `Heading`, or other notes-style destinations.
 
-<img width="1368" height="1260" alt="image" src="https://github.com/user-attachments/assets/f05ba500-0c23-4921-bb7f-8d640e0695df" />
-
+<img width="684" height="630" alt="SMOOSH mapping" src="https://github.com/user-attachments/assets/6f5f6dc6-9441-494d-b40e-9cfbe2dd419f" />
 
 Example rich text output:
 
@@ -314,4 +328,5 @@ $includeLabelInSmooshedValues = $true
 - `v0.5` - Added merge-on-match options, February 23, 2026
 - `v0.6` - Added constant fallback values and combined relation handling on match, March 3, 2026
 - `v0.8` - Added password, photo, public photo, and upload reattribution, March 4, 2026
-- 'v1.0' - Finalized GUI, added forward,back buttons, and field indicator panel.
+- `v1.0` - Finalized GUI, added forward,back buttons, and field indicator panel.
+- `v1.2` - Consolidated forms for easier review / navigation, added source-data filter for mapped or L2L migrations
