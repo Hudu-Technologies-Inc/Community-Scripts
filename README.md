@@ -45,6 +45,7 @@ Collection of Hudu Community Scripts for anyone to use/run/remix/reference.
 - **Syncing and SIEM**
   - [Hudu → Microsoft Fabric Sync](https://github.com/Hudu-Technologies-Inc/Hudu-Microsoft-Fabric-Sync)
   - [Hudu → Splunk Sync](./Syncing-and-SIEM/Splunk-Sync/)
+  - [Hudu → Halo Websites Sync](./Syncing-and-SIEM/Halo-Website-Sync/)
 
 ---
 
