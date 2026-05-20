@@ -6,6 +6,8 @@ Sync Hudu websites into Halo PSA
 
 Python3.9 or newer - [Easy Install Guide](https://github.com/Hudu-Technologies-Inc/Community-Scripts/tree/main/Client-Libraries/Python/Install-Python)
 
+***Windows, MacOs, Linux, or other OSes should be fine***
+
 ## Setup
 
 ### 1. construct environment
