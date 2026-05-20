@@ -1,6 +1,10 @@
 # halosync
 
-Sync Hudu websites into Halo PSA (assets or services).
+Sync Hudu websites into Halo PSA
+
+## Prerequisites
+
+Python3.9 or newer - [Easy Install Guide](https://github.com/Hudu-Technologies-Inc/Community-Scripts/tree/main/Client-Libraries/Python/Install-Python)
 
 ## Setup
 
@@ -26,6 +30,15 @@ source .env
 python Sync-Websites.py --dry-run   # preview
 python Sync-Websites.py             # sync
 ```
+
+Your stdout will look roughly like this:
+
+<img width="491" height="34" alt="image" src="https://github.com/user-attachments/assets/84a40bc5-818a-451d-949a-4b055cce58fa" />
+
+and will finish with a summary
+
+<img width="493" height="31" alt="image" src="https://github.com/user-attachments/assets/9acb8eaf-052a-413f-8a8b-c234caabacbc" />
+
 
 ## Notes format
 
