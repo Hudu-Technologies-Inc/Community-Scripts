@@ -69,8 +69,6 @@ Provide your Hudu URL and API key.
 
 Pick the layout you are moving **from** and the layout you are moving **to**.
 
-<img width="1602" height="496" alt="image" src="https://github.com/user-attachments/assets/ddc48c70-ad21-4597-8709-c1ea0abd58bc" />
-
 If you are confident with your source/dest selection, it's generally a good idea to archive source data afterwards.
 
 
@@ -78,10 +76,11 @@ If you are confident with your source/dest selection, it's generally a good idea
 
 You will then get a confirmation step to review or change the selection.
 
-<img width="1482" height="700" alt="image" src="https://github.com/user-attachments/assets/b30274f3-a28c-46a7-ae1c-13fc99cc1cf4" />
-
+<img width="1488" height="772" alt="image" src="https://github.com/user-attachments/assets/ee8477f3-7c28-4ac8-b717-a79a60526abc" />
 
 If an incoming source asset appears to match an existing destination asset, you can choose how the tool should behave.
+
+You can also enable custom matching criteria in the transfer options. After field mapping is complete, the wizard will ask for primary, secondary, and tertiary criteria from the mapped `destination <= source` field pairs, plus asset name. Each criterion can use direct case-insensitive matching or broader contains-either-way matching. During transfer, the criteria are checked in order against destination assets in the same company, and later criteria can narrow multiple earlier matches.
 
 ### 4-B (optional) filtering
 
@@ -120,6 +119,8 @@ When a source asset appears to match a destination asset, choose one of these be
 - `Skip`: do not transfer the source asset if a match is found
 
 Use `Merge-Concat` when you want to preserve both sets of notes or descriptive text. Use `Merge-FillBlanks` when the destination is already your source of truth.
+
+**tip*- Use custom matching criteria when matched objects are the expectation in order to achieve fewer cleanup tasks and higher accuracy*
 
 ---
 
@@ -242,7 +243,13 @@ A source asset is treated as a likely match when:
 
 Very short names are intentionally not matched too aggressively.
 
+When custom matching criteria are enabled, those configured criteria replace the default name matcher. The transfer checks the primary criterion first, then secondary, then tertiary; blank source values are skipped for that criterion. Direct matching compares trimmed text case-insensitively, while the broader option matches when either value contains the other. If a criterion narrows the result to multiple destination assets, the next criterion is used to keep narrowing.
+
+<img width="1816" height="672" alt="image" src="https://github.com/user-attachments/assets/ba88f9d3-05ac-47f2-a90c-41c3fb5bd230" />
+
 This matching logic helps prevent accidental duplicates while still allowing flexible merge behavior.
+
+<img width="1584" height="324" alt="image" src="https://github.com/user-attachments/assets/7c40111a-6448-4f1e-8e9f-bf97a6382b5c" />
 
 ---
 
@@ -330,3 +337,4 @@ $includeLabelInSmooshedValues = $true
 - `v0.8` - Added password, photo, public photo, and upload reattribution, March 4, 2026
 - `v1.0` - Finalized GUI, added forward,back buttons, and field indicator panel.
 - `v1.2` - Consolidated forms for easier review / navigation, added source-data filter for mapped or L2L migrations
+- `v1.3` - Addition of Custom Matching Criteria and Conditions, Matching behavior customization, May 28, 2026
