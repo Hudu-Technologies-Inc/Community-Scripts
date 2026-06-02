@@ -1,0 +1,19 @@
+# Per-run output (logs, summaries) created by Checklists-To-Processes.ps1
+runs/
+**/runs/
+debug/
+**/debug/
+**/logs/
+**/tmp/
+
+# Downloaded/cached HuduAPI module (fetched on first run)
+.huduapi/
+
+# Local secrets / environment overrides
+*environ*
+!environment.example
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+*.swp
