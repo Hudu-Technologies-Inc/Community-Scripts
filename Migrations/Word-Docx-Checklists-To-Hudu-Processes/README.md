@@ -9,6 +9,7 @@ subtasks.
 
 This tool follows the same local-files approach as
 [Files-Hudu-Migration](../Files-Hudu-Migration): you sync the SharePoint
+library locally, then run against the folder. No Azure app registration or
 SharePoint Graph credentials are required.
 
 ## How a document maps to a process
