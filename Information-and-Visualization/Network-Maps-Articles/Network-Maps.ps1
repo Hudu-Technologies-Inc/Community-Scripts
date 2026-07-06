@@ -4,8 +4,8 @@ $AzVault_Name           = "MyVaultName"                          # Name of your 
 $UseAZVault = $false
 
 # Hudu Instance
-$HuduBaseURL            = "https://myinstance.huducloud.com"     # Hudu Instance URL (no trailing slashes)
-$HuduBaseURL            = "https://mason-z.hudu.app"
+$HuduBaseURL            =  $HuduBaseURL ?? `
+                          "https://myinstance.huducloud.com"     # Hudu Instance URL (no trailing slashes)
 
 # Customization
 $networkRolesListName = "Network Roles"
@@ -966,6 +966,25 @@ function ConvertTo-HtmlText {
   return "$Text" -replace '&','&amp;' -replace '<','&lt;' -replace '>','&gt;'
 }
 
+function ConvertTo-HtmlAttribute {
+  param([AllowNull()][string]$Text)
+  if ($null -eq $Text) { return '' }
+  return "$Text" -replace '&','&amp;' -replace '<','&lt;' -replace '>','&gt;' -replace '"','&quot;'
+}
+
+function ConvertTo-MermaidCssColor {
+  param(
+    [AllowNull()][string]$Color,
+    [string]$Fallback = '#d1d5db'
+  )
+  if ([string]::IsNullOrWhiteSpace($Color)) { return $Fallback }
+  $trimmed = $Color.Trim()
+  if ($trimmed -match '^#(?<rgb>[0-9a-fA-F]{6})[0-9a-fA-F]{2}$') {
+    return "#$($Matches.rgb)"
+  }
+  return $trimmed
+}
+
 function New-MermaidNodeId {
   param(
     [Parameter(Mandatory)][string]$Type,
@@ -995,6 +1014,8 @@ function New-NetworkMapMermaidArticle {
     [bool] $ShowDetails = $true,
     [int] $MaxAddressesPerNetwork = 50,
     [hashtable] $ColorByType = @{},
+    [hashtable] $ColorByStatus = @{},
+    [bool] $CurvyEdges = $true,
     [string] $Direction = 'LR'
   )
 
@@ -1086,6 +1107,7 @@ function New-NetworkMapMermaidArticle {
         Type = $Type
         Url = $Url
         Meta = $Meta
+        Status = $Meta.Status
       }
     }
   }
@@ -1177,7 +1199,8 @@ function New-NetworkMapMermaidArticle {
   }
 
   $diagram = New-Object System.Text.StringBuilder
-  [void]$diagram.AppendLine("%%{init: {`"flowchart`": {`"htmlLabels`": true}, `"theme`": `"base`", `"themeVariables`": {`"lineColor`": `"$EdgeColor`", `"primaryTextColor`": `"$TextColor`"}}}%%")
+  $curve = if ($CurvyEdges) { 'basis' } else { 'linear' }
+  [void]$diagram.AppendLine("%%{init: {`"flowchart`": {`"htmlLabels`": true, `"curve`": `"$curve`"}, `"theme`": `"base`", `"themeVariables`": {`"lineColor`": `"$(ConvertTo-MermaidCssColor $EdgeColor)`", `"primaryTextColor`": `"$(ConvertTo-MermaidCssColor $TextColor '#111827')`", `"fontFamily`": `"Inter, Segoe UI, Arial, sans-serif`"}}}%%")
   [void]$diagram.AppendLine("flowchart $Direction")
 
   $typeLabels = @{
@@ -1218,11 +1241,32 @@ function New-NetworkMapMermaidArticle {
         'Address' { $AddressColor }
       }
     }
-    [void]$diagram.AppendLine("  classDef $type fill:$fill,stroke:$EdgeColor,color:$TextColor;")
+    $fill = ConvertTo-MermaidCssColor $fill
+    [void]$diagram.AppendLine("  classDef $type fill:$fill,stroke:$(ConvertTo-MermaidCssColor $EdgeColor),stroke-width:1px,color:$(ConvertTo-MermaidCssColor $TextColor '#111827');")
     $ids = @($nodes.Values | Where-Object { $_.Type -eq $type } | ForEach-Object { $_.Id })
     if ($ids.Count -gt 0) {
       [void]$diagram.AppendLine("  class $($ids -join ',') $type;")
     }
+  }
+
+  foreach ($node in $nodes.Values) {
+    $fill = if ($ColorByType -and $ColorByType.ContainsKey($node.Type)) { $ColorByType[$node.Type] } else {
+      switch ($node.Type) {
+        'Zone'    { $ZoneColor }
+        'VLAN'    { $VlanColor }
+        'Network' { $NetworkColor }
+        'Asset'   { $AssetColor }
+        'Address' { $AddressColor }
+      }
+    }
+    $status = $node.Status
+    $stroke = if ($status -and $ColorByStatus -and $ColorByStatus.ContainsKey($status)) {
+      $ColorByStatus[$status]
+    } else {
+      $EdgeColor
+    }
+    $strokeWidth = if ($status) { '4px' } else { '1px' }
+    [void]$diagram.AppendLine("  style $($node.Id) fill:$(ConvertTo-MermaidCssColor $fill),stroke:$(ConvertTo-MermaidCssColor $stroke),stroke-width:$strokeWidth,color:$(ConvertTo-MermaidCssColor $TextColor '#111827')")
   }
 
   $target = if ($OpenLinksInNewWindow) { '_blank' } else { '_self' }
@@ -1232,7 +1276,43 @@ function New-NetworkMapMermaidArticle {
   }
 
   $mermaid = $diagram.ToString().Trim()
-  return "<pre class=`"mermaid`">$(ConvertTo-HtmlText $mermaid)</pre>"
+  $typeLegendItems = foreach ($type in @('Zone','VLAN','Network','Asset','Address')) {
+    if (-not @($nodes.Values | Where-Object { $_.Type -eq $type })) { continue }
+    $fill = if ($ColorByType -and $ColorByType.ContainsKey($type)) { $ColorByType[$type] } else {
+      switch ($type) {
+        'Zone'    { $ZoneColor }
+        'VLAN'    { $VlanColor }
+        'Network' { $NetworkColor }
+        'Asset'   { $AssetColor }
+        'Address' { $AddressColor }
+      }
+    }
+    "<span style=`"display:inline-flex;align-items:center;gap:6px;margin:0 8px 8px 0;padding:5px 9px;border:1px solid $(ConvertTo-HtmlAttribute (ConvertTo-MermaidCssColor $EdgeColor));border-radius:7px;background:#ffffff;color:$(ConvertTo-HtmlAttribute (ConvertTo-MermaidCssColor $TextColor '#111827'));font-size:12px;`"><span style=`"width:11px;height:11px;border-radius:3px;background:$(ConvertTo-HtmlAttribute (ConvertTo-MermaidCssColor $fill));display:inline-block;`"></span>$type</span>"
+  }
+
+  $statusValues = @($nodes.Values | Where-Object { $_.Status } | ForEach-Object { $_.Status } | Sort-Object -Unique)
+  $statusLegendItems = foreach ($status in $statusValues) {
+    $color = if ($ColorByStatus -and $ColorByStatus.ContainsKey($status)) { $ColorByStatus[$status] } else { $EdgeColor }
+    "<span style=`"display:inline-flex;align-items:center;gap:6px;margin:0 8px 8px 0;padding:5px 9px;border:1px solid $(ConvertTo-HtmlAttribute (ConvertTo-MermaidCssColor $EdgeColor));border-radius:7px;background:#ffffff;color:$(ConvertTo-HtmlAttribute (ConvertTo-MermaidCssColor $TextColor '#111827'));font-size:12px;`"><span style=`"width:11px;height:11px;border-radius:999px;background:$(ConvertTo-HtmlAttribute (ConvertTo-MermaidCssColor $color));display:inline-block;`"></span>$(ConvertTo-HtmlText $status)</span>"
+  }
+
+  $counts = @($nodes.Values | Group-Object Type | Sort-Object Name | ForEach-Object { "$($_.Name): $($_.Count)" }) -join ' &middot; '
+  $generated = Get-Date -Format 'yyyy-MM-dd HH:mm'
+  $legend = @"
+<div style="border:1px solid rgba(107,114,128,.35);border-radius:8px;padding:12px 14px;margin:0 0 12px 0;background:linear-gradient(180deg,rgba(255,255,255,.88),rgba(255,255,255,.72));color:$(ConvertTo-HtmlAttribute (ConvertTo-MermaidCssColor $TextColor '#111827'));font-family:Inter,Segoe UI,Arial,sans-serif;">
+  <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap;">
+    <div>
+      <div style="font-size:18px;font-weight:700;line-height:1.2;">Network Map</div>
+      <div style="font-size:12px;opacity:.72;margin-top:4px;">$counts &middot; Generated $generated</div>
+    </div>
+    <div style="font-size:12px;opacity:.72;">Fill = entity type &middot; border = status</div>
+  </div>
+  <div style="margin-top:12px;">$($typeLegendItems -join '')</div>
+  $(if ($statusLegendItems) { "<div style=`"margin-top:2px;`">$($statusLegendItems -join '')</div>" } else { "" })
+</div>
+"@
+
+  return "$legend`n<pre class=`"mermaid`">$(ConvertTo-HtmlText $mermaid)</pre>"
 }
 
 
@@ -1510,7 +1590,7 @@ $assetNodeById = @{}
 
 foreach ($network in $allNetworks) {
 
-  $articleName = Get-SafeFilename "$NetworkArticleNamingPrefix - $($network.name ?? $network.address) - $NetworkArticleNamingSuffix"
+  $articleName = Get-SafeFilename "$NetworkArticleNamingPrefix $($($($network.name ?? $network.address) -split'/')[0] ?? 'Network') $NetworkArticleNamingSuffix" -replace "  ",' '
 
   $netsForCompany = $allNetworks | Where-Object {$_.company_id -eq $network.company_id}
   $grouped = Group-IpAddressesByNetwork -IpAddresses $allIPs -Networks $netsForCompany -CompanyId $network.company_id
@@ -1541,7 +1621,9 @@ foreach ($network in $allNetworks) {
         -ShowDetails:$ShowDetails `
         -MaxAddressesPerNetwork $MaxAddressesPerNetwork `
         -OpenLinksInNewWindow $OpenLinksInNewWindow `
-        -ColorByType $ColorByType
+        -ColorByType $ColorByType `
+        -ColorByStatus $ColorByStatus `
+        -CurvyEdges:$CurvyEdges
     }
     "SvgHtml" {
       New-NetworkMapSvgHtml `

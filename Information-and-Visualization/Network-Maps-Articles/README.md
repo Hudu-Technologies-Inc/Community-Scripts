@@ -40,6 +40,14 @@ $NetworkMapOutputFormat = "SvgHtml"
 
 Mermaid output skips the icon upload/bootstrap article because those SVG icon assets are only used by the legacy SVG/HTML renderer. The generated Mermaid diagram still keeps Hudu entity links using Mermaid `click` directives where Hudu's renderer allows them.
 
+The Mermaid renderer reuses the same palette settings where Mermaid supports them:
+
+- `$ColorByType` sets each entity node's fill color.
+- `$ColorByStatus` sets a thicker node border for entities with a known status.
+- `$CurvyEdges` controls Mermaid's line curve style.
+
+Because Hudu renders Mermaid natively, this mode cannot reproduce the full custom SVG card layout or embedded SVG icons, but the generated article includes a compact legend/header so the diagrams are closer in polish to the original SVG/HTML output.
+
 Main Entities Mapped:
 
 - VLANs and Zones are in the leftmost two columns (Blue/Orange)
