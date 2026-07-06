@@ -48,12 +48,25 @@ The Mermaid renderer reuses the same palette settings where Mermaid supports the
 
 Because Hudu renders Mermaid natively, this mode cannot reproduce the full custom SVG card layout or embedded SVG icons, but the generated article includes a compact legend/header so the diagrams are closer in polish to the original SVG/HTML output.
 
+### Website Links
+
+The Mermaid renderer can optionally add a `Website` column for Hudu Website records related to IP addresses:
+
+```powershell
+$IncludeWebsiteLinks = $true
+$ResolvePublicWebsiteDns = $true
+$MaxWebsitesPerAddress = 3
+```
+
+Website links are added when an address FQDN matches a normalized Hudu website name/host for the same company. For public networks (`network_type = 1`), the script can also resolve Hudu website A records and link websites whose DNS resolves to the IP address. This intentionally uses DNS rather than WHOIS to keep the map generation fast and avoid loose ownership matches.
+
 Main Entities Mapped:
 
 - VLANs and Zones are in the leftmost two columns (Blue/Orange)
 - Networks are in the center column (Green)
 - Linked/Associated assets are pulled in (Yellow)
 - IP Addresses are rightmost, tied to asset, or directly linked to network (Grey)
+- Matched Hudu Websites are shown after IP Addresses when website linking is enabled (Purple)
 
 WAN Networks and Public IP Ranges/Blocks are supported here. Really, anything that is IPV4 is supported!
 

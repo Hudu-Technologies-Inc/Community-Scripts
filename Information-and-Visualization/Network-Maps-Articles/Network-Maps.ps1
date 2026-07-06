@@ -19,6 +19,7 @@ $VlanColor       = '#6aa9ff'
 $ZoneColor       = '#ffaa6a'
 $AssetColor      = '#f7e55ba0'
 $AddressColor    = '#9aa0a6'
+$WebsiteColor    = '#c084fc'
 $ActiveDeviceColor = "#00ea4aff"
 $reservedColor = "#ffff00"
 $InactiveColor = "#ff0000"
@@ -31,6 +32,10 @@ $IncludeExtendedNetworkMeta = $true #Show 'Type','LocationId','Description','VLA
 $IncludeExtendedAssetMeta = $true # Show 'Name','Manufacturer','Model','Serial' Properties in Assets
 
 $IncludeAddressMeta = $true  # Show 'Status','FQDN','Description' properties in Address
+
+$IncludeWebsiteLinks = $true # Link IP address FQDN/public DNS matches to Hudu Website records
+$ResolvePublicWebsiteDns = $true # Resolve Hudu website DNS for IP matches on Public networks only
+$MaxWebsitesPerAddress = 3 # Avoid crowding the diagram when multiple websites resolve to the same IP
 
 $ShowDetails = $true # Add additional relationships and entity details during page generation
 
@@ -60,6 +65,7 @@ $ColorByType = @{
   Zone    = $ZoneColor
   Asset   = $AssetColor
   Address = $AddressColor
+  Website = $WebsiteColor
 }
 
 $AvailableIcons = @(
@@ -346,6 +352,71 @@ function Group-IpAddressesByNetwork {
   $groups.Values
 }
 
+function Get-NormalizedWebsiteHost {
+  param([AllowNull()][string]$Website)
+  if ([string]::IsNullOrWhiteSpace($Website)) { return $null }
+
+  $s = $Website.Trim()
+  if ($s -notmatch '^\w+://') { $s = "http://$s" }
+
+  try {
+    $uri = [Uri]$s
+    $hostname = $uri.IdnHost
+    if ($hostname.StartsWith('[') -and $hostname.EndsWith(']')) { $hostname = $hostname.Trim('[',']') }
+    return $hostname.TrimEnd('.').ToLowerInvariant()
+  } catch {
+    $t = $Website.Trim()
+    $t = $t -replace '^\w+://',''
+    $t = $t -replace '^[^@/]*@',''
+    $t = $t.TrimStart('[').TrimEnd(']')
+    $t = $t -replace '[:/].*$',''
+    return $t.TrimEnd('.').ToLowerInvariant()
+  }
+}
+
+function Get-HuduWebsiteRecordUrl {
+  param(
+    [Parameter(Mandatory)]$Website,
+    [AllowNull()][string]$HuduBaseUrl
+  )
+  if ($Website.url) {
+    if ($Website.url -match '^https?://') { return $Website.url }
+    if ($HuduBaseUrl) { return "$($HuduBaseUrl.TrimEnd('/'))$($Website.url)" }
+  }
+  if ($Website.slug -and $HuduBaseUrl) {
+    return "$($HuduBaseUrl.TrimEnd('/'))/websites/$($Website.slug)"
+  }
+  return $null
+}
+
+function Resolve-WebsiteIPv4Addresses {
+  param([AllowNull()][string]$HostName)
+  if ([string]::IsNullOrWhiteSpace($HostName)) { return @() }
+  if (-not $script:WebsiteDnsCache) { $script:WebsiteDnsCache = @{} }
+
+  $key = $HostName.TrimEnd('.').ToLowerInvariant()
+  if ($script:WebsiteDnsCache.ContainsKey($key)) { return @($script:WebsiteDnsCache[$key]) }
+
+  $resolved = @()
+  try {
+    if (Get-Command -Name Resolve-DnsName -ErrorAction SilentlyContinue) {
+      $resolved = @(Resolve-DnsName -Name $key -Type A -ErrorAction Stop |
+        Where-Object { $_.IPAddress -and $_.IPAddress -match '^\d{1,3}(\.\d{1,3}){3}$' } |
+        Select-Object -ExpandProperty IPAddress -Unique)
+    } else {
+      $resolved = @([System.Net.Dns]::GetHostAddresses($key) |
+        Where-Object { $_.AddressFamily -eq [System.Net.Sockets.AddressFamily]::InterNetwork } |
+        ForEach-Object { $_.IPAddressToString } |
+        Select-Object -Unique)
+    }
+  } catch {
+    $resolved = @()
+  }
+
+  $script:WebsiteDnsCache[$key] = @($resolved)
+  return @($resolved)
+}
+
 function Get-NetworkContext {
   [CmdletBinding()]
   param(
@@ -353,12 +424,16 @@ function Get-NetworkContext {
     [AllowNull()][object[]] $AllVlans,
     [AllowNull()][object[]] $AllVlanZones,
     [AllowNull()][object[]] $AllIpAddresses = $null,
+    [AllowNull()][object[]] $AllWebsites = $null,
     $NetworkRoleList = $null,
     $NetworkStatusList = $null,
     [string] $HuduBaseUrl = $null,
     [bool] $IncludeExtendedNetworkMeta = $true,
     [bool] $IncludeExtendedAssetMeta = $true,
-    [bool] $IncludeAddressMeta = $true
+    [bool] $IncludeAddressMeta = $true,
+    [bool] $IncludeWebsiteLinks = $false,
+    [bool] $ResolvePublicWebsiteDns = $true,
+    [int] $MaxWebsitesPerAddress = 3
   )
 
   # local helpers so this function is self-contained
@@ -476,6 +551,69 @@ function Get-NetworkContext {
     }
   }
 
+  $WebsiteMatchesByAddressKey = @{}
+  if ($IncludeWebsiteLinks -and $AllWebsites) {
+    $companyWebsites = @($AllWebsites | Where-Object { $_ -and $_.company_id -eq $Network.company_id })
+    $websiteRows = foreach ($site in $companyWebsites) {
+      $host = Get-NormalizedWebsiteHost $site.name
+      if (-not $host) { continue }
+      [pscustomobject]@{
+        Website = $site
+        Host    = $host
+        Url     = Get-HuduWebsiteRecordUrl -Website $site -HuduBaseUrl $HuduBaseUrl
+      }
+    }
+
+    $isPublicNetwork = $false
+    try { $isPublicNetwork = ([int]$Network.network_type -eq 1) } catch {}
+    $websiteRowsByHost = @{}
+    foreach ($row in @($websiteRows)) {
+      if (-not $websiteRowsByHost.ContainsKey($row.Host)) {
+        $websiteRowsByHost[$row.Host] = New-Object System.Collections.Generic.List[object]
+      }
+      $websiteRowsByHost[$row.Host].Add($row) | Out-Null
+    }
+
+    foreach ($ip in $addresses) {
+      $matches = New-Object System.Collections.Generic.List[object]
+      $addrKey = "$($ip.id ?? $ip.address)"
+      $fqdnHost = Get-NormalizedWebsiteHost $ip.fqdn
+
+      if ($fqdnHost -and $websiteRowsByHost.ContainsKey($fqdnHost)) {
+        foreach ($row in $websiteRowsByHost[$fqdnHost]) {
+          $matches.Add([pscustomobject]@{
+            Website = $row.Website
+            Host = $row.Host
+            Url = $row.Url
+            MatchReason = 'FQDN'
+          }) | Out-Null
+        }
+      }
+
+      if ($isPublicNetwork -and $ResolvePublicWebsiteDns -and $ip.address) {
+        foreach ($row in @($websiteRows)) {
+          if ($fqdnHost -and $row.Host -eq $fqdnHost) { continue }
+          $resolvedIps = Resolve-WebsiteIPv4Addresses -HostName $row.Host
+          if ($resolvedIps -contains "$($ip.address)") {
+            $alreadyMatched = @($matches | Where-Object { $_.Website.id -eq $row.Website.id } | Select-Object -First 1)
+            if (-not $alreadyMatched) {
+              $matches.Add([pscustomobject]@{
+                Website = $row.Website
+                Host = $row.Host
+                Url = $row.Url
+                MatchReason = 'DNS'
+              }) | Out-Null
+            }
+          }
+        }
+      }
+
+      if ($matches.Count -gt 0) {
+        $WebsiteMatchesByAddressKey[$addrKey] = @($matches | Select-Object -First $MaxWebsitesPerAddress)
+      }
+    }
+  }
+
   # Role/Status names
   $roleName   = if ($Network.role_list_item_id -and $NetworkRoleList)   { ($NetworkRoleList.list_items | Where-Object id -eq $Network.role_list_item_id | Select-Object -First 1).name } else { '' }
   $statusName = if ($Network.status_list_item_id -and $NetworkStatusList){ ($NetworkStatusList.list_items | Where-Object id -eq $Network.status_list_item_id | Select-Object -First 1).name } else { '' }
@@ -494,6 +632,7 @@ function Get-NetworkContext {
     NetworkMeta      = $NetworkExtraMeta
     AssetMetaById    = $AssetExtraMetaById
     AddressMetaByKey = $AddrExtraMetaByKey
+    WebsiteMatchesByAddressKey = $WebsiteMatchesByAddressKey
   }
 }
 
@@ -1027,6 +1166,7 @@ function New-NetworkMapMermaidArticle {
       'Network' { return "$Id[`"$Label`"]" }
       'Asset'   { return "$Id[`"$Label`"]" }
       'Address' { return "$Id([`"$Label`"])" }
+      'Website' { return "$Id[[`"$Label`"]]" }
       default   { return "$Id[`"$Label`"]" }
     }
   }
@@ -1079,6 +1219,11 @@ function New-NetworkMapMermaidArticle {
           _AddMetaLine -Lines $lines -Label 'Status' -Value $Meta.Status
           _AddMetaLine -Lines $lines -Label 'FQDN' -Value $Meta.FQDN
           _AddMetaLine -Lines $lines -Label 'Description' -Value $Meta.Description
+        }
+        'Website' {
+          _AddMetaLine -Lines $lines -Label 'Host' -Value $Meta.Host
+          _AddMetaLine -Lines $lines -Label 'Match' -Value $Meta.Match
+          _AddMetaLine -Lines $lines -Label 'Status' -Value $Meta.Status
         }
       }
     } elseif ($Type -eq 'Network' -and $Meta.CIDR) {
@@ -1195,6 +1340,21 @@ function New-NetworkMapMermaidArticle {
         $src = $assetNodeById["$($ip.asset_id)"]
       }
       AddLink -Source $src -Target $ipid
+
+      if ($ctx.WebsiteMatchesByAddressKey -and $ctx.WebsiteMatchesByAddressKey.ContainsKey($addrKey)) {
+        foreach ($match in @($ctx.WebsiteMatchesByAddressKey[$addrKey])) {
+          $site = $match.Website
+          $wid = New-MermaidNodeId -Type 'Website' -Id $site.id
+          $siteMeta = @{
+            Host = $match.Host
+            Match = $match.MatchReason
+            Status = $site.status
+            Paused = $site.paused
+          }
+          AddNode -Id $wid -Label ($site.name ?? "Website $($site.id)") -Type 'Website' -Url $match.Url -Meta $siteMeta
+          AddLink -Source $ipid -Target $wid
+        }
+      }
     }
   }
 
@@ -1209,8 +1369,9 @@ function New-NetworkMapMermaidArticle {
     Network = 'Networks'
     Asset = 'Assets'
     Address = 'Addresses'
+    Website = 'Websites'
   }
-  foreach ($type in @('Zone','VLAN','Network','Asset','Address')) {
+  foreach ($type in @('Zone','VLAN','Network','Asset','Address','Website')) {
     $typedNodes = @($nodes.Values | Where-Object { $_.Type -eq $type } | Sort-Object Label)
     if (-not $typedNodes) { continue }
     [void]$diagram.AppendLine("  subgraph $($type)Column[`"$($typeLabels[$type])`"]")
@@ -1231,7 +1392,7 @@ function New-NetworkMapMermaidArticle {
     [void]$diagram.AppendLine("  $($link.Source) $edge $($link.Target)")
   }
 
-  foreach ($type in @('Zone','VLAN','Network','Asset','Address')) {
+  foreach ($type in @('Zone','VLAN','Network','Asset','Address','Website')) {
     $fill = if ($ColorByType -and $ColorByType.ContainsKey($type)) { $ColorByType[$type] } else {
       switch ($type) {
         'Zone'    { $ZoneColor }
@@ -1239,6 +1400,7 @@ function New-NetworkMapMermaidArticle {
         'Network' { $NetworkColor }
         'Asset'   { $AssetColor }
         'Address' { $AddressColor }
+        'Website' { $WebsiteColor }
       }
     }
     $fill = ConvertTo-MermaidCssColor $fill
@@ -1257,6 +1419,7 @@ function New-NetworkMapMermaidArticle {
         'Network' { $NetworkColor }
         'Asset'   { $AssetColor }
         'Address' { $AddressColor }
+        'Website' { $WebsiteColor }
       }
     }
     $status = $node.Status
@@ -1276,7 +1439,7 @@ function New-NetworkMapMermaidArticle {
   }
 
   $mermaid = $diagram.ToString().Trim()
-  $typeLegendItems = foreach ($type in @('Zone','VLAN','Network','Asset','Address')) {
+  $typeLegendItems = foreach ($type in @('Zone','VLAN','Network','Asset','Address','Website')) {
     if (-not @($nodes.Values | Where-Object { $_.Type -eq $type })) { continue }
     $fill = if ($ColorByType -and $ColorByType.ContainsKey($type)) { $ColorByType[$type] } else {
       switch ($type) {
@@ -1285,6 +1448,7 @@ function New-NetworkMapMermaidArticle {
         'Network' { $NetworkColor }
         'Asset'   { $AssetColor }
         'Address' { $AddressColor }
+        'Website' { $WebsiteColor }
       }
     }
     "<span style=`"display:inline-flex;align-items:center;gap:6px;margin:0 8px 8px 0;padding:5px 9px;border:1px solid $(ConvertTo-HtmlAttribute (ConvertTo-MermaidCssColor $EdgeColor));border-radius:7px;background:#ffffff;color:$(ConvertTo-HtmlAttribute (ConvertTo-MermaidCssColor $TextColor '#111827'));font-size:12px;`"><span style=`"width:11px;height:11px;border-radius:3px;background:$(ConvertTo-HtmlAttribute (ConvertTo-MermaidCssColor $fill));display:inline-block;`"></span>$type</span>"
@@ -1585,6 +1749,13 @@ Write-Host "Getting available vlan zones..."
 try {$allVlanZones = Get-HuduVLANZones} catch {$allVlanZones=@()}
 Write-host "$($allVlanZones.count) VLAN Zones(s) found from $($($allVlanZones.company_id | select-object -unique).count) Companies."
   $allIPs = Get-HuduIPAddresses
+if ($IncludeWebsiteLinks) {
+  Write-Host "Getting available websites..."
+  try { $allWebsites = @(Get-HuduWebsites) } catch { $allWebsites = @(); Write-Warning "Unable to load Hudu websites for network map linking: $_" }
+  Write-Host "$($allWebsites.count) Website(s) found from $($($allWebsites.company_id | Select-Object -Unique).count) Companies."
+} else {
+  $allWebsites = @()
+}
 $assetNodeById = @{}
 
 
@@ -1604,12 +1775,16 @@ foreach ($network in $allNetworks) {
       AllVlans                   = $allVlans
       AllVlanZones               = $allVlanZones
       AllIpAddresses             = $ipsForN
+      AllWebsites                = $allWebsites
       NetworkRoleList            = $NetworkRoleList
       NetworkStatusList          = $NetworkStatusList
       HuduBaseUrl                = $HuduBaseURL
       IncludeExtendedNetworkMeta = $IncludeExtendedNetworkMeta
       IncludeExtendedAssetMeta   = $IncludeExtendedAssetMeta
       IncludeAddressMeta         = $IncludeAddressMeta
+      IncludeWebsiteLinks        = $IncludeWebsiteLinks
+      ResolvePublicWebsiteDns    = $ResolvePublicWebsiteDns
+      MaxWebsitesPerAddress      = $MaxWebsitesPerAddress
     }
     Get-NetworkContext @ctxArgs
   }
