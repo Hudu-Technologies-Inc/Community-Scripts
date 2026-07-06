@@ -33,6 +33,10 @@ $IncludeAddressMeta = $true  # Show 'Status','FQDN','Description' properties in 
 
 $ShowDetails = $true # Add additional relationships and entity details during page generation
 
+$NetworkMapOutputFormat = "Mermaid" # Mermaid uses Hudu's native diagram renderer. SvgHtml keeps the original generated SVG/HTML output.
+
+$MaxAddressesPerNetwork = 50
+
 $CurvyEdges = $true # Use Bézier curves or straight lines when drawing relationship lines
 
 $SaveHTML=$false # Save a copy of network HTML to local directory
@@ -955,6 +959,281 @@ foreach($e in $links){
   if($ReturnOnly -or -not $OutFile){ return $html }
 }
 
+function ConvertTo-HtmlText {
+  param([AllowNull()][string]$Text)
+  if ($null -eq $Text) { return '' }
+  return "$Text" -replace '&','&amp;' -replace '<','&lt;' -replace '>','&gt;'
+}
+
+function New-MermaidNodeId {
+  param(
+    [Parameter(Mandatory)][string]$Type,
+    [AllowNull()]$Id
+  )
+  $safe = "$Type`_$Id" -replace '[^A-Za-z0-9_]', '_'
+  if ($safe -notmatch '^[A-Za-z_]') { $safe = "n_$safe" }
+  return $safe
+}
+
+function ConvertTo-MermaidLabelText {
+  param([AllowNull()]$Text)
+  if ($null -eq $Text) { return '' }
+  return "$Text" `
+    -replace '&','&amp;' `
+    -replace '<','&lt;' `
+    -replace '>','&gt;' `
+    -replace '"',"'"`
+    -replace '\r?\n',' '
+}
+
+function New-NetworkMapMermaidArticle {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)] $Contexts,
+    [bool] $OpenLinksInNewWindow = $true,
+    [bool] $ShowDetails = $true,
+    [int] $MaxAddressesPerNetwork = 50,
+    [hashtable] $ColorByType = @{},
+    [string] $Direction = 'LR'
+  )
+
+  function _NodeShape {
+    param([string]$Id,[string]$Type,[string]$Label)
+    switch ($Type) {
+      'Zone'    { return "$Id([`"$Label`"])" }
+      'VLAN'    { return "$Id[[`"$Label`"]]" }
+      'Network' { return "$Id[`"$Label`"]" }
+      'Asset'   { return "$Id[`"$Label`"]" }
+      'Address' { return "$Id([`"$Label`"])" }
+      default   { return "$Id[`"$Label`"]" }
+    }
+  }
+
+  function _AddMetaLine {
+    param(
+      [System.Collections.Generic.List[string]]$Lines,
+      [string]$Label,
+      [AllowNull()]$Value
+    )
+    if ($null -ne $Value -and "$Value" -ne '') {
+      [void]$Lines.Add("$Label`: $(ConvertTo-MermaidLabelText $Value)")
+    }
+  }
+
+  function _BuildLabel {
+    param(
+      [string]$Type,
+      [string]$Name,
+      [hashtable]$Meta
+    )
+
+    $lines = New-Object System.Collections.Generic.List[string]
+    $title = if ([string]::IsNullOrWhiteSpace($Name)) { $Type } else { $Name }
+    [void]$lines.Add((ConvertTo-MermaidLabelText "$Type`: $title"))
+
+    if ($ShowDetails) {
+      switch ($Type) {
+        'Network' {
+          _AddMetaLine -Lines $lines -Label 'CIDR' -Value $Meta.CIDR
+          _AddMetaLine -Lines $lines -Label 'Role' -Value $Meta.Role
+          _AddMetaLine -Lines $lines -Label 'Status' -Value $Meta.Status
+          _AddMetaLine -Lines $lines -Label 'Type' -Value $Meta.Type
+          _AddMetaLine -Lines $lines -Label 'VLAN ID' -Value ($Meta.'VLAN ID' ?? $Meta.VLAN_ID)
+        }
+        'VLAN' {
+          _AddMetaLine -Lines $lines -Label 'VLAN ID' -Value ($Meta.VLAN_ID ?? $Meta.'VLAN ID')
+          _AddMetaLine -Lines $lines -Label 'Description' -Value $Meta.Description
+        }
+        'Zone' {
+          _AddMetaLine -Lines $lines -Label 'Range' -Value $Meta.VLAN_Range
+          _AddMetaLine -Lines $lines -Label 'Description' -Value $Meta.Description
+        }
+        'Asset' {
+          _AddMetaLine -Lines $lines -Label 'Manufacturer' -Value $Meta.Manufacturer
+          _AddMetaLine -Lines $lines -Label 'Model' -Value $Meta.Model
+          _AddMetaLine -Lines $lines -Label 'Serial' -Value $Meta.Serial
+        }
+        'Address' {
+          _AddMetaLine -Lines $lines -Label 'Status' -Value $Meta.Status
+          _AddMetaLine -Lines $lines -Label 'FQDN' -Value $Meta.FQDN
+          _AddMetaLine -Lines $lines -Label 'Description' -Value $Meta.Description
+        }
+      }
+    } elseif ($Type -eq 'Network' -and $Meta.CIDR) {
+      _AddMetaLine -Lines $lines -Label 'CIDR' -Value $Meta.CIDR
+    }
+
+    return ($lines | Select-Object -First 6) -join '<br/>'
+  }
+
+  $nodes = @{}
+  $links = New-Object System.Collections.Generic.List[object]
+  $assetNodeById = @{}
+
+  function AddNode {
+    param(
+      [string]$Id,
+      [string]$Label,
+      [string]$Type,
+      [AllowNull()][string]$Url,
+      [hashtable]$Meta
+    )
+    if (-not $nodes.ContainsKey($Id)) {
+      $nodes[$Id] = [pscustomobject]@{
+        Id = $Id
+        Label = $Label
+        Type = $Type
+        Url = $Url
+        Meta = $Meta
+      }
+    }
+  }
+
+  function AddLink {
+    param([string]$Source,[string]$Target,[string]$Label = $null)
+    if ($Source -and $Target) {
+      [void]$links.Add([pscustomobject]@{ Source = $Source; Target = $Target; Label = $Label })
+    }
+  }
+
+  foreach ($ctx in @($Contexts)) {
+    $net  = $ctx.Network
+    $vlan = $ctx.Vlan
+    $zone = $ctx.Zone
+
+    $nid = New-MermaidNodeId -Type 'Network' -Id $net.id
+    $netName = $net.description ?? $net.name ?? $net.address ?? "Network $($net.id)"
+    $netMeta = @{
+      CIDR      = $net.address
+      Role      = $ctx.RoleName
+      Status    = $ctx.StatusName
+      CompanyId = $net.company_id
+    }
+    if ($ctx.NetworkMeta) {
+      foreach ($k in $ctx.NetworkMeta.Keys) { $netMeta[$k] = $ctx.NetworkMeta[$k] }
+    }
+    AddNode -Id $nid -Label $netName -Type 'Network' -Url $net.url -Meta $netMeta
+
+    $vid = $null
+    if ($vlan) {
+      $vid = New-MermaidNodeId -Type 'VLAN' -Id $vlan.id
+      AddNode -Id $vid -Label ($vlan.name ?? "VLAN $($vlan.id)") -Type 'VLAN' -Url $vlan.url -Meta @{
+        VLAN_ID = $vlan.vlan_id
+        Description = $vlan.description
+      }
+      AddLink -Source $vid -Target $nid
+    }
+
+    if ($zone) {
+      $zid = New-MermaidNodeId -Type 'Zone' -Id $zone.id
+      AddNode -Id $zid -Label ($zone.name ?? "Zone $($zone.id)") -Type 'Zone' -Url $zone.url -Meta @{
+        VLAN_Range = $zone.vlan_id_ranges
+        Description = $zone.description
+      }
+      AddLink -Source $zid -Target ($vid ?? $nid)
+    }
+
+    foreach ($asset in @($ctx.Assets)) {
+      $aid = New-MermaidNodeId -Type 'Asset' -Id $asset.id
+      $assetMeta = @{
+        CompanyId = $asset.company_id
+        LayoutId  = $asset.asset_layout_id
+        AssetId   = $asset.id
+      }
+      if ($ctx.AssetMetaById -and $ctx.AssetMetaById.ContainsKey("$($asset.id)")) {
+        foreach ($k in $ctx.AssetMetaById["$($asset.id)"].Keys) {
+          $assetMeta[$k] = $ctx.AssetMetaById["$($asset.id)"][$k]
+        }
+      }
+      AddNode -Id $aid -Label ($asset.name ?? "Asset $($asset.id)") -Type 'Asset' -Url $asset.url -Meta $assetMeta
+      AddLink -Source $nid -Target $aid
+      $assetNodeById["$($asset.id)"] = $aid
+    }
+
+    foreach ($ip in @($ctx.Addresses | Select-Object -First $MaxAddressesPerNetwork)) {
+      $ipKey = $ip.id ?? $ip.address
+      $ipid = New-MermaidNodeId -Type 'Address' -Id $ipKey
+      $ipMeta = @{
+        Hostname    = $ip.hostname
+        Status      = $ip.status
+        Description = $ip.description
+        FQDN        = $ip.fqdn
+      }
+      $addrKey = "$ipKey"
+      if ($ctx.AddressMetaByKey -and $ctx.AddressMetaByKey.ContainsKey($addrKey)) {
+        foreach ($k in $ctx.AddressMetaByKey[$addrKey].Keys) {
+          $ipMeta[$k] = $ctx.AddressMetaByKey[$addrKey][$k]
+        }
+      }
+
+      AddNode -Id $ipid -Label ($ip.address ?? "Address $ipKey") -Type 'Address' -Url $ip.url -Meta $ipMeta
+      $src = $nid
+      if ($ip.asset_id -and $assetNodeById.ContainsKey("$($ip.asset_id)")) {
+        $src = $assetNodeById["$($ip.asset_id)"]
+      }
+      AddLink -Source $src -Target $ipid
+    }
+  }
+
+  $diagram = New-Object System.Text.StringBuilder
+  [void]$diagram.AppendLine("%%{init: {`"flowchart`": {`"htmlLabels`": true}, `"theme`": `"base`", `"themeVariables`": {`"lineColor`": `"$EdgeColor`", `"primaryTextColor`": `"$TextColor`"}}}%%")
+  [void]$diagram.AppendLine("flowchart $Direction")
+
+  $typeLabels = @{
+    Zone = 'Zones'
+    VLAN = 'VLANs'
+    Network = 'Networks'
+    Asset = 'Assets'
+    Address = 'Addresses'
+  }
+  foreach ($type in @('Zone','VLAN','Network','Asset','Address')) {
+    $typedNodes = @($nodes.Values | Where-Object { $_.Type -eq $type } | Sort-Object Label)
+    if (-not $typedNodes) { continue }
+    [void]$diagram.AppendLine("  subgraph $($type)Column[`"$($typeLabels[$type])`"]")
+    [void]$diagram.AppendLine("    direction TB")
+    foreach ($node in $typedNodes) {
+      $label = _BuildLabel -Type $node.Type -Name $node.Label -Meta $node.Meta
+      [void]$diagram.AppendLine("    $(_NodeShape -Id $node.Id -Type $node.Type -Label $label)")
+    }
+    [void]$diagram.AppendLine("  end")
+  }
+
+  foreach ($link in $links) {
+    $edge = if ($link.Label) {
+      "-->|$(ConvertTo-MermaidLabelText $link.Label)|"
+    } else {
+      "-->"
+    }
+    [void]$diagram.AppendLine("  $($link.Source) $edge $($link.Target)")
+  }
+
+  foreach ($type in @('Zone','VLAN','Network','Asset','Address')) {
+    $fill = if ($ColorByType -and $ColorByType.ContainsKey($type)) { $ColorByType[$type] } else {
+      switch ($type) {
+        'Zone'    { $ZoneColor }
+        'VLAN'    { $VlanColor }
+        'Network' { $NetworkColor }
+        'Asset'   { $AssetColor }
+        'Address' { $AddressColor }
+      }
+    }
+    [void]$diagram.AppendLine("  classDef $type fill:$fill,stroke:$EdgeColor,color:$TextColor;")
+    $ids = @($nodes.Values | Where-Object { $_.Type -eq $type } | ForEach-Object { $_.Id })
+    if ($ids.Count -gt 0) {
+      [void]$diagram.AppendLine("  class $($ids -join ',') $type;")
+    }
+  }
+
+  $target = if ($OpenLinksInNewWindow) { '_blank' } else { '_self' }
+  foreach ($node in @($nodes.Values | Where-Object { $_.Url })) {
+    $tooltip = ConvertTo-MermaidLabelText "$($node.Type): $($node.Label)"
+    [void]$diagram.AppendLine("  click $($node.Id) `"$($node.Url)`" `"$tooltip`" $target")
+  }
+
+  $mermaid = $diagram.ToString().Trim()
+  return "<pre class=`"mermaid`">$(ConvertTo-HtmlText $mermaid)</pre>"
+}
+
 
 function Test-IpInCidr {
   [CmdletBinding()] param(
@@ -1147,50 +1426,53 @@ if ($HuduBaseURL -eq "https://YourHuduUrl.huducloud.com"){
 }
 
 
-Get-PSVersionCompatible; Get-HuduModule; Set-HuduInstance; Get-HuduVersionCompatible;
-$attributableArticle = Get-HuduArticles -name "Network Maps Icons" | select-object -first 1
-if (-not $attributableArticle) {
-    Write-Host "Creating '$iconsArticleName' article to hold network icons..." -ForegroundColor Yellow
-    $attributableArticle = New-HuduArticle -name $iconsArticleName -content "This article '$iconsArticleName' holds the reusable SVG icons used by the Network Maps script."; $attributableArticle = $attributableArticle.article ?? $attributableArticle;
-}
-$Alluploads = Get-HuduUploads
-foreach ($item in $AvailableIcons) {
-    $fileLeaf  = "$($NetworkArticleNamingPrefix)$($item.Name)$($NetworkArticleNamingSuffix).$($item.Type)"
-    $filePath  = Join-Path $WorkDir $fileLeaf
-    $basename  = Split-Path -Leaf $filePath
+Get-PSVersionCompatible; Get-HuduModule; Set-HuduInstance; Get-HuduVersionCompatible -requiredVersion $(if ($NetworkMapOutputFormat -eq "Mermaid") { "2.43.0" } else { "2.39.2" });
+$IconHrefByType = @{}
+if ($NetworkMapOutputFormat -eq "SvgHtml") {
+  $attributableArticle = Get-HuduArticles -name "Network Maps Icons" | select-object -first 1
+  if (-not $attributableArticle) {
+      Write-Host "Creating '$iconsArticleName' article to hold network icons..." -ForegroundColor Yellow
+      $attributableArticle = New-HuduArticle -name $iconsArticleName -content "This article '$iconsArticleName' holds the reusable SVG icons used by the Network Maps script."; $attributableArticle = $attributableArticle.article ?? $attributableArticle;
+  }
+  $Alluploads = Get-HuduUploads
+  foreach ($item in $AvailableIcons) {
+      $fileLeaf  = "$($NetworkArticleNamingPrefix)$($item.Name)$($NetworkArticleNamingSuffix).$($item.Type)"
+      $filePath  = Join-Path $WorkDir $fileLeaf
+      $basename  = Split-Path -Leaf $filePath
 
-    if (-not $item.UploadId) {
-        WriteB64ToFile -DataUrl $item.Icon -OutFile $filePath
+      if (-not $item.UploadId) {
+          WriteB64ToFile -DataUrl $item.Icon -OutFile $filePath
 
-        $existing = $AllUploads | Where-Object { $_.name -eq $basename } | Select-Object -First 1
+          $existing = $AllUploads | Where-Object { $_.name -eq $basename } | Select-Object -First 1
 
-        if (-not $existing) {
-            Write-Host "Uploading $($item.type), $($Item.name) from $($filepath) to $(get-hudubaseurl)"
-            $upload = New-HuduUpload -FilePath $filePath -uploadable_id $attributableArticle.id -uploadable_type "Article"; $upload = $upload.upload ?? $upload;
-            $item.UploadId = $upload.id
+          if (-not $existing) {
+              Write-Host "Uploading $($item.type), $($Item.name) from $($filepath) to $(get-hudubaseurl)"
+              $upload = New-HuduUpload -FilePath $filePath -uploadable_id $attributableArticle.id -uploadable_type "Article"; $upload = $upload.upload ?? $upload;
+              $item.UploadId = $upload.id
 
 
-        } else {
-            $item.UploadId = $existing.id
-        }
-        write-host "$($Item.type) is at $($item.UploadID)"
+          } else {
+              $item.UploadId = $existing.id
+          }
+          write-host "$($Item.type) is at $($item.UploadID)"
 
-        try { Remove-Item -LiteralPath $filePath -ErrorAction SilentlyContinue } catch {}
-    }
-}
-$IconByType = @{
-  Network = ($AvailableIcons | ? Name -eq 'Switch'   | select -First 1).UploadId
-  VLAN    = ($AvailableIcons | ? Name -eq 'Container'| select -First 1).UploadId
-  Zone    = ($AvailableIcons | ? Name -eq 'DMZ'      | select -First 1).UploadId
-  Asset   = ($AvailableIcons | ? Name -eq 'Endpoint' | select -First 1).UploadId
-  Address = $null
-}
-$IconHrefByType = @{
-  Network = Get-UploadUrlById $IconByType.Network
-  VLAN    = Get-UploadUrlById $IconByType.VLAN
-  Zone    = Get-UploadUrlById $IconByType.Zone
-  Asset   = Get-UploadUrlById $IconByType.Asset
-  Address = Get-UploadUrlById $IconByType.Address
+          try { Remove-Item -LiteralPath $filePath -ErrorAction SilentlyContinue } catch {}
+      }
+  }
+  $IconByType = @{
+    Network = ($AvailableIcons | ? Name -eq 'Switch'   | select -First 1).UploadId
+    VLAN    = ($AvailableIcons | ? Name -eq 'Container'| select -First 1).UploadId
+    Zone    = ($AvailableIcons | ? Name -eq 'DMZ'      | select -First 1).UploadId
+    Asset   = ($AvailableIcons | ? Name -eq 'Endpoint' | select -First 1).UploadId
+    Address = $null
+  }
+  $IconHrefByType = @{
+    Network = Get-UploadUrlById $IconByType.Network
+    VLAN    = Get-UploadUrlById $IconByType.VLAN
+    Zone    = Get-UploadUrlById $IconByType.Zone
+    Asset   = Get-UploadUrlById $IconByType.Asset
+    Address = Get-UploadUrlById $IconByType.Address
+  }
 }
 $AllLists = Get-HuduLists
 if ($AllLists -and $AllLists.count -gt 1){
@@ -1237,6 +1519,8 @@ foreach ($network in $allNetworks) {
       AllVlans                   = $allVlans
       AllVlanZones               = $allVlanZones
       AllIpAddresses             = $ipsForN
+      NetworkRoleList            = $NetworkRoleList
+      NetworkStatusList          = $NetworkStatusList
       HuduBaseUrl                = $HuduBaseURL
       IncludeExtendedNetworkMeta = $IncludeExtendedNetworkMeta
       IncludeExtendedAssetMeta   = $IncludeExtendedAssetMeta
@@ -1245,17 +1529,32 @@ foreach ($network in $allNetworks) {
     Get-NetworkContext @ctxArgs
   }
 
-  $html = New-NetworkMapSvgHtml `
-    -Contexts $ctxs `
-    -ShowDetails:$ShowDetails `
-    -CurvyEdges:$CurvyEdges `
-    -MaxAddressesPerNetwork 50 `
-    -IconHrefByType $IconHrefByType `
-    -OpenLinksInNewWindow $OpenLinksInNewWindow `
-    -ColorByStatus $ColorByStatus `
-    -ColorByType $ColorByType `
-    -ReturnOnly `
-    -NodeWidth 240 -NodeHeight 52 -HGap 420 -VPad 48
+  $html = switch ($NetworkMapOutputFormat) {
+    "Mermaid" {
+      New-NetworkMapMermaidArticle `
+        -Contexts $ctxs `
+        -ShowDetails:$ShowDetails `
+        -MaxAddressesPerNetwork $MaxAddressesPerNetwork `
+        -OpenLinksInNewWindow $OpenLinksInNewWindow `
+        -ColorByType $ColorByType
+    }
+    "SvgHtml" {
+      New-NetworkMapSvgHtml `
+        -Contexts $ctxs `
+        -ShowDetails:$ShowDetails `
+        -CurvyEdges:$CurvyEdges `
+        -MaxAddressesPerNetwork $MaxAddressesPerNetwork `
+        -IconHrefByType $IconHrefByType `
+        -OpenLinksInNewWindow $OpenLinksInNewWindow `
+        -ColorByStatus $ColorByStatus `
+        -ColorByType $ColorByType `
+        -ReturnOnly `
+        -NodeWidth 240 -NodeHeight 52 -HGap 420 -VPad 48
+    }
+    default {
+      throw "Unsupported NetworkMapOutputFormat '$NetworkMapOutputFormat'. Use 'Mermaid' or 'SvgHtml'."
+    }
+  }
 
   if ($SaveHTML) {
     $htmlPath = Join-Path $workdir (Get-SafeFilename -Name "$articleName.html")

@@ -24,6 +24,22 @@ If you'd prefer that this runs on a schedule or non-interactively to always give
 
 Each entity in a given network matrix is clickable and drills into the Hudu record for that item.
 
+## Native Mermaid Output
+
+This script now defaults to Hudu's native Mermaid article renderer:
+
+```powershell
+$NetworkMapOutputFormat = "Mermaid"
+```
+
+In Mermaid mode, the article content is generated as a `<pre class="mermaid">...</pre>` block, so Hudu renders the diagram inside the article after it is saved. The original generated SVG/HTML renderer is still available:
+
+```powershell
+$NetworkMapOutputFormat = "SvgHtml"
+```
+
+Mermaid output skips the icon upload/bootstrap article because those SVG icon assets are only used by the legacy SVG/HTML renderer. The generated Mermaid diagram still keeps Hudu entity links using Mermaid `click` directives where Hudu's renderer allows them.
+
 Main Entities Mapped:
 
 - VLANs and Zones are in the leftmost two columns (Blue/Orange)
