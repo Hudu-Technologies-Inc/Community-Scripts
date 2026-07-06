@@ -4,7 +4,8 @@ $AzVault_Name           = "MyVaultName"                          # Name of your 
 $UseAZVault = $false
 
 # Hudu Instance
-$HuduBaseURL            = "https://YourHuduUrl.huducloud.com"    # URL of your Hudu Instance
+$HuduBaseURL            = "https://myinstance.huducloud.com"     # Hudu Instance URL (no trailing slashes)
+$HuduBaseURL            = "https://mason-z.hudu.app"
 
 # Customization
 $networkRolesListName = "Network Roles"
@@ -35,14 +36,14 @@ $ShowDetails = $true # Add additional relationships and entity details during pa
 
 $NetworkMapOutputFormat = "Mermaid" # Mermaid uses Hudu's native diagram renderer. SvgHtml keeps the original generated SVG/HTML output.
 
-$MaxAddressesPerNetwork = 50
+$MaxAddressesPerNetwork = 200
 
 $CurvyEdges = $true # Use Bézier curves or straight lines when drawing relationship lines
 
 $SaveHTML=$false # Save a copy of network HTML to local directory
 
-$NetworkArticleNamingPrefix = "Network-"
-$NetworkArticleNamingSuffix = "-Article"
+$NetworkArticleNamingPrefix = ""
+$NetworkArticleNamingSuffix = "$NetworkMapOutputFormat Chart"
 
 $ColorByStatus = @{
   'Active'    = $ActiveDeviceColor
@@ -499,7 +500,7 @@ function Get-NetworkContext {
 
 function Get-SafeFilename {
     param([string]$Name,
-        [int]$MaxLength=25
+        [int]$MaxLength=40
     )
 
     # If there's a '?', take only the part before it
@@ -1475,14 +1476,18 @@ if ($NetworkMapOutputFormat -eq "SvgHtml") {
   }
 }
 $AllLists = Get-HuduLists
+$NetworkRoleList = $null; $NetworkStatusList = $null
 if ($AllLists -and $AllLists.count -gt 1){
     $NetworkRoleList = $($AllLists | where-object {Test-Equiv -A $_.name -B "$networkRolesListName"} | select-object -first 1)
-    $NetworkRoleList = $NetworkRoleList ?? $(Select-ObjectFromList -objects $AllLists -allowNull $false -message "Which list is for your network roles?")
     $NetworkStatusList = $($AllLists | where-object {Test-Equiv -A $_.name -B "$networkStatusesListName"} | select-object -first 1)
-    $NetworkStatusList = $NetworkStatusList ?? $(Select-ObjectFromList -objects $($AllLists | Where-Object {-not $_.id -eq $($NetworkStatusList.id ?? 0)}) -allowNull $false -message "Which list is for your network statuses?")
-} else {
+}
+if ($null -eq $NetworkRoleList) {
     $NetworkRoleList = $(new-hudulist -name "$networkRolesListName" -items @("LAN","WAN","DMZ","C25 VPN","S2S VPN"))
-    $NetworkStatusList = $(new-hudulist -name "$networkStatusesListName" -items @("Active","Reserved","Deprecated"))
+    $NetworkRoleList = get-hudulists -id $NetworkRoleList.id; $NetworkRoleList = $NetworkRoleList.list ?? $NetworkRoleList;
+}
+if ($null -eq $NetworkStatusList) { 
+  $NetworkStatusList = $(new-hudulist -name "$networkStatusesListName" -items @("Active","Reserved","Deprecated"))
+  $NetworkStatusList = get-hudulists -id $NetworkStatusList.id; $NetworkStatusList = $NetworkStatusList.list ?? $NetworkStatusList;
 }
 
 
@@ -1505,7 +1510,7 @@ $assetNodeById = @{}
 
 foreach ($network in $allNetworks) {
 
-  $articleName = Get-SafeFilename "$NetworkArticleNamingPrefix$($network.description ?? "Network $($network.id)")"
+  $articleName = Get-SafeFilename "$NetworkArticleNamingPrefix - $($network.name ?? $network.address) - $NetworkArticleNamingSuffix"
 
   $netsForCompany = $allNetworks | Where-Object {$_.company_id -eq $network.company_id}
   $grouped = Group-IpAddressesByNetwork -IpAddresses $allIPs -Networks $netsForCompany -CompanyId $network.company_id
