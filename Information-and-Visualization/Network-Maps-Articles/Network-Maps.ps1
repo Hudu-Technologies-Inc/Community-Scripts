@@ -49,6 +49,8 @@ $SaveHTML=$false # Save a copy of network HTML to local directory
 
 $NetworkArticleNamingPrefix = ""
 $NetworkArticleNamingSuffix = "$NetworkMapOutputFormat Chart"
+$NetworkArticleTitleMaxLength = 120
+$NetworkArticleIncludeId = $true
 
 $ColorByStatus = @{
   'Active'    = $ActiveDeviceColor
@@ -361,9 +363,9 @@ function Get-NormalizedWebsiteHost {
 
   try {
     $uri = [Uri]$s
-    $hostname = $uri.IdnHost
-    if ($hostname.StartsWith('[') -and $hostname.EndsWith(']')) { $hostname = $hostname.Trim('[',']') }
-    return $hostname.TrimEnd('.').ToLowerInvariant()
+    $remoteHostName = $uri.IdnHost
+    if ($remoteHostName.StartsWith('[') -and $remoteHostName.EndsWith(']')) { $remoteHostName = $remoteHostName.Trim('[',']') }
+    return $remoteHostName.TrimEnd('.').ToLowerInvariant()
   } catch {
     $t = $Website.Trim()
     $t = $t -replace '^\w+://',''
@@ -390,11 +392,11 @@ function Get-HuduWebsiteRecordUrl {
 }
 
 function Resolve-WebsiteIPv4Addresses {
-  param([AllowNull()][string]$HostName)
-  if ([string]::IsNullOrWhiteSpace($HostName)) { return @() }
+  param([Alias('HostName')][AllowNull()][string]$remoteHostName)
+  if ([string]::IsNullOrWhiteSpace($remoteHostName)) { return @() }
   if (-not $script:WebsiteDnsCache) { $script:WebsiteDnsCache = @{} }
 
-  $key = $HostName.TrimEnd('.').ToLowerInvariant()
+  $key = $remoteHostName.TrimEnd('.').ToLowerInvariant()
   if ($script:WebsiteDnsCache.ContainsKey($key)) { return @($script:WebsiteDnsCache[$key]) }
 
   $resolved = @()
@@ -555,11 +557,11 @@ function Get-NetworkContext {
   if ($IncludeWebsiteLinks -and $AllWebsites) {
     $companyWebsites = @($AllWebsites | Where-Object { $_ -and $_.company_id -eq $Network.company_id })
     $websiteRows = foreach ($site in $companyWebsites) {
-      $host = Get-NormalizedWebsiteHost $site.name
-      if (-not $host) { continue }
+      $remoteHost = Get-NormalizedWebsiteHost $site.name
+      if (-not $remoteHost) { continue }
       [pscustomobject]@{
         Website = $site
-        Host    = $host
+        Host    = $remoteHost
         Url     = Get-HuduWebsiteRecordUrl -Website $site -HuduBaseUrl $HuduBaseUrl
       }
     }
@@ -659,6 +661,144 @@ function Get-SafeFilename {
     }
 
     return "$SafeName$SafeExt"
+}
+
+function Normalize-ArticleTitle {
+  param([AllowNull()][string]$Name)
+  if ([string]::IsNullOrWhiteSpace($Name)) { return '' }
+  return (($Name.Trim() -replace '\s+', ' ').ToLowerInvariant())
+}
+
+function Get-NetworkDisplayName {
+  param([Parameter(Mandatory)]$Network)
+  $name = $Network.name ?? $Network.description ?? $Network.address ?? "Network $($Network.id)"
+  $name = "$name".Trim()
+  if ([string]::IsNullOrWhiteSpace($name)) { return "Network $($Network.id)" }
+  return $name
+}
+
+function Get-NetworkArticleTitle {
+  param(
+    [Parameter(Mandatory)]$Network,
+    [AllowNull()][string]$Prefix,
+    [AllowNull()][string]$Suffix,
+    [int]$MaxLength = 120,
+    [bool]$IncludeId = $true
+  )
+
+  $parts = @($Prefix, (Get-NetworkDisplayName -Network $Network), $Suffix) |
+    Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+  $title = (($parts -join ' ') -replace '\s+', ' ').Trim()
+  if ($IncludeId) {
+    $idSuffix = " [Network $($Network.id)]"
+    $allowedBaseLength = [Math]::Max(1, $MaxLength - $idSuffix.Length)
+    if ($title.Length -gt $allowedBaseLength) {
+      $title = $title.Substring(0, $allowedBaseLength).TrimEnd()
+    }
+    $title = "$title$idSuffix"
+  } elseif ($title.Length -gt $MaxLength) {
+    $title = $title.Substring(0, $MaxLength).TrimEnd()
+  }
+  return $title
+}
+
+function Get-LegacyNetworkArticleTitles {
+  param(
+    [Parameter(Mandatory)]$Network,
+    [AllowNull()][string]$Prefix,
+    [AllowNull()][string]$Suffix
+  )
+
+  $names = New-Object System.Collections.Generic.List[string]
+  $currentLegacy = Get-SafeFilename "$Prefix $($($($Network.name ?? $Network.address) -split'/')[0] ?? 'Network') $Suffix"
+  $currentLegacy = ($currentLegacy -replace '\s+', ' ').Trim()
+  if ($currentLegacy) { $names.Add($currentLegacy) | Out-Null }
+
+  $olderLegacy = Get-SafeFilename "$Prefix$($Network.description ?? "Network $($Network.id)")"
+  $olderLegacy = ($olderLegacy -replace '\s+', ' ').Trim()
+  if ($olderLegacy) { $names.Add($olderLegacy) | Out-Null }
+
+  $plainParts = @($Prefix, (Get-NetworkDisplayName -Network $Network), $Suffix) |
+    Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+  $plain = (($plainParts -join ' ') -replace '\s+', ' ').Trim()
+  if ($plain) { $names.Add($plain) | Out-Null }
+
+  return @($names | Select-Object -Unique)
+}
+
+function Get-NetworkMapArticleMarker {
+  param([Parameter(Mandatory)]$Network)
+  return "hudu-network-map network_id=$($Network.id)"
+}
+
+function Add-NetworkMapArticleMarker {
+  param(
+    [Parameter(Mandatory)][string]$Content,
+    [Parameter(Mandatory)]$Network,
+    [Parameter(Mandatory)][string]$Format
+  )
+  $marker = Get-NetworkMapArticleMarker -Network $Network
+  return "<!-- $marker format=$Format -->`n$Content"
+}
+
+function Get-HuduArticleCore {
+  param($Article)
+  if ($null -eq $Article) { return $null }
+  return $Article.article ?? $Article
+}
+
+function Get-CachedHuduCompanyArticles {
+  param(
+    [Parameter(Mandatory)][int]$CompanyId,
+    [Parameter(Mandatory)][hashtable]$Cache
+  )
+  $key = "$CompanyId"
+  if (-not $Cache.ContainsKey($key)) {
+    $Cache[$key] = @(Get-HuduArticles -CompanyId $CompanyId | ForEach-Object { Get-HuduArticleCore $_ } | Where-Object { $_ })
+  }
+  return @($Cache[$key])
+}
+
+function Update-CachedHuduCompanyArticle {
+  param(
+    [Parameter(Mandatory)][int]$CompanyId,
+    [Parameter(Mandatory)][hashtable]$Cache,
+    [Parameter(Mandatory)]$Article
+  )
+  $core = Get-HuduArticleCore $Article
+  if (-not $core) { return }
+  $key = "$CompanyId"
+  $existing = @($Cache[$key] | Where-Object { $_.id -ne $core.id })
+  $Cache[$key] = @($existing + $core)
+}
+
+function Find-HuduNetworkMapArticle {
+  param(
+    [Parameter(Mandatory)]$Network,
+    [Parameter(Mandatory)][string]$ArticleName,
+    [Parameter(Mandatory)][object[]]$CompanyArticles,
+    [AllowNull()][string[]]$LegacyNames = @()
+  )
+
+  $normalizedArticleName = Normalize-ArticleTitle $ArticleName
+  $matches = @($CompanyArticles | Where-Object { (Normalize-ArticleTitle $_.name) -eq $normalizedArticleName })
+
+  if (-not $matches) {
+    $marker = Get-NetworkMapArticleMarker -Network $Network
+    $matches = @($CompanyArticles | Where-Object { "$($_.content)" -like "*$marker*" })
+  }
+
+  if (-not $matches) {
+    $normalizedLegacyNames = @($LegacyNames | ForEach-Object { Normalize-ArticleTitle $_ } | Where-Object { $_ } | Select-Object -Unique)
+    $matches = @($CompanyArticles | Where-Object { $normalizedLegacyNames -contains (Normalize-ArticleTitle $_.name) })
+  }
+
+  $matches = @($matches | Sort-Object updated_at -Descending)
+  if ($matches.Count -gt 1) {
+    Write-Warning "Multiple candidate network map articles found for Network $($Network.id): $($matches.name -join ', '). Updating article id $($matches[0].id)."
+  }
+
+  return ($matches | Select-Object -First 1)
 }
 
 function Ensure-FadeTextGradient {
@@ -1757,11 +1897,21 @@ if ($IncludeWebsiteLinks) {
   $allWebsites = @()
 }
 $assetNodeById = @{}
+$ArticlesByCompanyId = @{}
 
 
 foreach ($network in $allNetworks) {
 
-  $articleName = Get-SafeFilename "$NetworkArticleNamingPrefix $($($($network.name ?? $network.address) -split'/')[0] ?? 'Network') $NetworkArticleNamingSuffix" -replace "  ",' '
+  $articleName = Get-NetworkArticleTitle `
+    -Network $network `
+    -Prefix $NetworkArticleNamingPrefix `
+    -Suffix $NetworkArticleNamingSuffix `
+    -MaxLength $NetworkArticleTitleMaxLength `
+    -IncludeId:$NetworkArticleIncludeId
+  $legacyArticleNames = Get-LegacyNetworkArticleTitles `
+    -Network $network `
+    -Prefix $NetworkArticleNamingPrefix `
+    -Suffix $NetworkArticleNamingSuffix
 
   $netsForCompany = $allNetworks | Where-Object {$_.company_id -eq $network.company_id}
   $grouped = Group-IpAddressesByNetwork -IpAddresses $allIPs -Networks $netsForCompany -CompanyId $network.company_id
@@ -1817,6 +1967,7 @@ foreach ($network in $allNetworks) {
       throw "Unsupported NetworkMapOutputFormat '$NetworkMapOutputFormat'. Use 'Mermaid' or 'SvgHtml'."
     }
   }
+  $html = Add-NetworkMapArticleMarker -Content $html -Network $network -Format $NetworkMapOutputFormat
 
   if ($SaveHTML) {
     $htmlPath = Join-Path $workdir (Get-SafeFilename -Name "$articleName.html")
@@ -1824,7 +1975,13 @@ foreach ($network in $allNetworks) {
     Write-Host "Wrote $articleName to $htmlPath"
   }
 
-  $article = Get-HuduArticles -companyId $network.company_id -name "$articleName"
+  $companyArticles = Get-CachedHuduCompanyArticles -CompanyId $network.company_id -Cache $ArticlesByCompanyId
+  $article = Find-HuduNetworkMapArticle `
+    -Network $network `
+    -ArticleName $articleName `
+    -LegacyNames $legacyArticleNames `
+    -CompanyArticles $companyArticles
+
   $articleRequest = @{
     Name      = $articleName
     Content   = $html
@@ -1832,10 +1989,12 @@ foreach ($network in $allNetworks) {
   }
   try {
     if ($article) {
-      $articleRequest["id"] = $($article.article.id ?? $article.id)
-      Set-HuduArticle @articleRequest
+      $articleRequest["id"] = $article.id
+      $updatedArticle = Set-HuduArticle @articleRequest
+      Update-CachedHuduCompanyArticle -CompanyId $network.company_id -Cache $ArticlesByCompanyId -Article $updatedArticle
     } else {
-      New-HuduArticle @articleRequest
+      $newArticle = New-HuduArticle @articleRequest
+      Update-CachedHuduCompanyArticle -CompanyId $network.company_id -Cache $ArticlesByCompanyId -Article $newArticle
     }
   } catch {
     Write-Error "$(if ($article) {"Error Updating Article $($article.id) $_"} else {"Error creating article $articleName $_"})"

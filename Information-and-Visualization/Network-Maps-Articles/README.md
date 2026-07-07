@@ -60,6 +60,18 @@ $MaxWebsitesPerAddress = 3
 
 Website links are added when an address FQDN matches a normalized Hudu website name/host for the same company. For public networks (`network_type = 1`), the script can also resolve Hudu website A records and link websites whose DNS resolves to the IP address. This intentionally uses DNS rather than WHOIS to keep the map generation fast and avoid loose ownership matches.
 
+### Article Naming and Updates
+
+Network map article names are generated from the prefix, network display name, output suffix, and Hudu network ID:
+
+```powershell
+$NetworkArticleNamingPrefix = ""
+$NetworkArticleNamingSuffix = "$NetworkMapOutputFormat Chart"
+$NetworkArticleIncludeId = $true
+```
+
+Including the network ID keeps article names stable and unique even when network names are similar or long. The script also searches for older generated names and an embedded source marker before creating a new article, so reruns should update existing map articles instead of creating duplicates. It does not automatically delete duplicate articles that were already created; those can be reviewed and removed manually after a successful rerun.
+
 Main Entities Mapped:
 
 - VLANs and Zones are in the leftmost two columns (Blue/Orange)
