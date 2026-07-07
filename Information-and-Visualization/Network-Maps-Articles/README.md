@@ -24,12 +24,61 @@ If you'd prefer that this runs on a schedule or non-interactively to always give
 
 Each entity in a given network matrix is clickable and drills into the Hudu record for that item.
 
+## Native Mermaid Output
+
+This script now defaults to Hudu's native Mermaid article renderer:
+
+```powershell
+$NetworkMapOutputFormat = "Mermaid"
+```
+
+In Mermaid mode, the article content is generated as a `<pre class="mermaid">...</pre>` block, so Hudu renders the diagram inside the article after it is saved. The original generated SVG/HTML renderer is still available:
+
+```powershell
+$NetworkMapOutputFormat = "SvgHtml"
+```
+
+Mermaid output skips the icon upload/bootstrap article because those SVG icon assets are only used by the legacy SVG/HTML renderer. The generated Mermaid diagram still keeps Hudu entity links using Mermaid `click` directives where Hudu's renderer allows them.
+
+The Mermaid renderer reuses the same palette settings where Mermaid supports them:
+
+- `$ColorByType` sets each entity node's fill color.
+- `$ColorByStatus` sets a thicker node border for entities with a known status.
+- `$CurvyEdges` controls Mermaid's line curve style.
+
+Because Hudu renders Mermaid natively, this mode cannot reproduce the full custom SVG card layout or embedded SVG icons, but the generated article includes a compact legend/header so the diagrams are closer in polish to the original SVG/HTML output.
+
+### Website Links
+
+The Mermaid renderer can optionally add a `Website` column for Hudu Website records related to IP addresses:
+
+```powershell
+$IncludeWebsiteLinks = $true
+$ResolvePublicWebsiteDns = $true
+$MaxWebsitesPerAddress = 3
+```
+
+Website links are added when an address FQDN matches a normalized Hudu website name/host for the same company. For public networks (`network_type = 1`), the script can also resolve Hudu website A records and link websites whose DNS resolves to the IP address. This intentionally uses DNS rather than WHOIS to keep the map generation fast and avoid loose ownership matches.
+
+### Article Naming and Updates
+
+Network map article names are generated from the prefix, network display name, output suffix, and Hudu network ID:
+
+```powershell
+$NetworkArticleNamingPrefix = ""
+$NetworkArticleNamingSuffix = "$NetworkMapOutputFormat Chart"
+$NetworkArticleIncludeId = $true
+```
+
+Including the network ID keeps article names stable and unique even when network names are similar or long. The script also searches for older generated names and an embedded source marker before creating a new article, so reruns should update existing map articles instead of creating duplicates. It does not automatically delete duplicate articles that were already created; those can be reviewed and removed manually after a successful rerun.
+
 Main Entities Mapped:
 
 - VLANs and Zones are in the leftmost two columns (Blue/Orange)
 - Networks are in the center column (Green)
 - Linked/Associated assets are pulled in (Yellow)
 - IP Addresses are rightmost, tied to asset, or directly linked to network (Grey)
+- Matched Hudu Websites are shown after IP Addresses when website linking is enabled (Purple)
 
 WAN Networks and Public IP Ranges/Blocks are supported here. Really, anything that is IPV4 is supported!
 
