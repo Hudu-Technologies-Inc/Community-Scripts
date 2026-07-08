@@ -7,15 +7,8 @@ Well, this makes doing so easy, customizable, and effortless! While fairly basic
 
 An article is either created or updated with related networks, vlans, zones, addressees, (and now websites)
 
-```powershell
-$huduBaseURL = "myinstance.huducloud.com";
-irm 'https://github.com/Hudu-Technologies-Inc/Community-Scripts/raw/refs/heads/main/Information-and-Visualization/Network-Maps-Articles/Network-Maps.ps1' | iex
-```
-
 
 ### Mermaid Chart Output ***(default)***
-
-<img width="652" height="263" alt="image" src="https://github.com/user-attachments/assets/e49fc916-3504-4134-a081-e0d62be243d7" />
 
 <img width="1334" height="998" alt="image" src="https://github.com/user-attachments/assets/dcb2700d-267e-4a82-a582-139d0e948461" />
 
@@ -25,7 +18,7 @@ irm 'https://github.com/Hudu-Technologies-Inc/Community-Scripts/raw/refs/heads/m
 <img width="3050" height="1246" alt="image" src="https://github.com/user-attachments/assets/24c4f29d-46c4-4b88-9188-32f736bed5e3" />
 
 ## Setup
-Setup is pretty easy. You have various customization options, but the meat and bones of what is needed is pretty simple.
+Setup is pretty easy. You have various customization options, but the meat and bones of what is needed is pretty simple and can be found near the top as variables for color. See-also [customizations](https://github.com/Hudu-Technologies-Inc/Community-Scripts/blob/main/Information-and-Visualization/Network-Maps-Articles/README.md#customizations)
 
 ## Run Once
 To run once or to test it out, you'll want to make sure that your `$HuduBaseURL` is set. Interactive use doesn't need a secrets provider, so you will be asked for your Hudu API key when running in this fashion.
@@ -35,6 +28,10 @@ To run once or to test it out, you'll want to make sure that your `$HuduBaseURL`
 ## Quick-Start One-liner
 
 
+```powershell
+$huduBaseURL = "myinstance.huducloud.com";
+irm 'https://github.com/Hudu-Technologies-Inc/Community-Scripts/raw/refs/heads/main/Information-and-Visualization/Network-Maps-Articles/Network-Maps.ps1' | iex
+```
 
 ## Run on a schedule
 If you'd prefer that this runs on a schedule or non-interactively to always give you the most up-to-date network maps, it's recommended that you use an Azure KeyVault for storing your Hudu API key. To enable this, you'll need to make sure $UseAZVault is set to $true, as well as setting your KeyVault name and Hudu API Key secret name. Also, you'll still want to make sure your $HuduBaseURL value is set.
