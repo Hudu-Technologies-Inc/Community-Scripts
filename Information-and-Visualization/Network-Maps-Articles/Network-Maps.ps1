@@ -48,7 +48,7 @@ $CurvyEdges = $true # Use Bézier curves or straight lines when drawing relation
 $SaveHTML=$false # Save a copy of network HTML to local directory
 
 $NetworkArticleNamingPrefix = ""
-$NetworkArticleNamingSuffix = "$NetworkMapOutputFormat Chart"
+$NetworkArticleNamingSuffix = "$NetworkMapOutputFormat Network Chart"
 $NetworkArticleTitleMaxLength = 120
 $NetworkArticleIncludeId = $true
 
