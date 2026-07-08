@@ -2,12 +2,12 @@
 
 **A simple and easy way to visualize physical assets and linked items in an organization.**
 
----
+[Original community post, Jul 8 2026](https://community.hudu.com/script-library-awpwerdu/post/feature-spotlight---mermaid-charts-in-hudu-hl70JiMiEesM8H5)
 
+---
 
 Visualizing your locations, networking hardware, and virtual/physical devices can be tricky. What if there were a way to turn all of that into simple, readable [Mermaid](https://mermaid.js.org/) charts?
 
-[Original community post, Jul 8 2026](https://community.hudu.com/script-library-awpwerdu/post/feature-spotlight---mermaid-charts-in-hudu-hl70JiMiEesM8H5)
 
 `build-relate-maps.ps1` builds one relation graph per company in your Hudu instance. It uses each company's own assets and articles as the starting scope, then pulls in every relation that touches those objects. Related objects that live in other companies are kept on the chart as external nodes, so cross-company relationships stay visible.
 
