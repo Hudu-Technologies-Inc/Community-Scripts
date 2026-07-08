@@ -157,3 +157,6 @@ You can also change the card color for each individual entity in the same way, i
 <img width="614" height="328" alt="image" src="https://github.com/user-attachments/assets/db67dfe7-5b79-40fa-b654-d29a463ed7dd" />
 
 
+## History
+
+July 8, 2026 - Added support for Mermaid Charts on network maps.

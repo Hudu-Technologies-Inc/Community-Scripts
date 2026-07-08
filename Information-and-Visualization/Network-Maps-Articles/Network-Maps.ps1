@@ -1500,7 +1500,10 @@ function New-NetworkMapMermaidArticle {
 
   $diagram = New-Object System.Text.StringBuilder
   $curve = if ($CurvyEdges) { 'basis' } else { 'linear' }
-  [void]$diagram.AppendLine("%%{init: {`"flowchart`": {`"htmlLabels`": true, `"curve`": `"$curve`"}, `"theme`": `"base`", `"themeVariables`": {`"lineColor`": `"$(ConvertTo-MermaidCssColor $EdgeColor)`", `"primaryTextColor`": `"$(ConvertTo-MermaidCssColor $TextColor '#111827')`", `"fontFamily`": `"Inter, Segoe UI, Arial, sans-serif`"}}}%%")
+  $mermaidBackground = ConvertTo-MermaidCssColor $BackgroundColor '#ffffff'
+  $mermaidText = ConvertTo-MermaidCssColor $TextColor '#111827'
+  $mermaidEdge = ConvertTo-MermaidCssColor $EdgeColor '#6b7280'
+  [void]$diagram.AppendLine("%%{init: {`"flowchart`": {`"htmlLabels`": true, `"curve`": `"$curve`"}, `"theme`": `"base`", `"themeVariables`": {`"background`": `"$mermaidBackground`", `"mainBkg`": `"$mermaidBackground`", `"clusterBkg`": `"$mermaidBackground`", `"clusterBorder`": `"$mermaidEdge`", `"primaryBorderColor`": `"$mermaidEdge`", `"lineColor`": `"$mermaidEdge`", `"primaryTextColor`": `"$mermaidText`", `"titleColor`": `"$mermaidText`", `"fontFamily`": `"Inter, Segoe UI, Arial, sans-serif`"}}}%%")
   [void]$diagram.AppendLine("flowchart $Direction")
 
   $typeLabels = @{
@@ -1544,7 +1547,7 @@ function New-NetworkMapMermaidArticle {
       }
     }
     $fill = ConvertTo-MermaidCssColor $fill
-    [void]$diagram.AppendLine("  classDef $type fill:$fill,stroke:$(ConvertTo-MermaidCssColor $EdgeColor),stroke-width:1px,color:$(ConvertTo-MermaidCssColor $TextColor '#111827');")
+    [void]$diagram.AppendLine("  classDef $type fill:$fill,stroke:$mermaidEdge,stroke-width:1px,color:$mermaidText;")
     $ids = @($nodes.Values | Where-Object { $_.Type -eq $type } | ForEach-Object { $_.Id })
     if ($ids.Count -gt 0) {
       [void]$diagram.AppendLine("  class $($ids -join ',') $type;")
@@ -1569,7 +1572,7 @@ function New-NetworkMapMermaidArticle {
       $EdgeColor
     }
     $strokeWidth = if ($status) { '4px' } else { '1px' }
-    [void]$diagram.AppendLine("  style $($node.Id) fill:$(ConvertTo-MermaidCssColor $fill),stroke:$(ConvertTo-MermaidCssColor $stroke),stroke-width:$strokeWidth,color:$(ConvertTo-MermaidCssColor $TextColor '#111827')")
+    [void]$diagram.AppendLine("  style $($node.Id) fill:$(ConvertTo-MermaidCssColor $fill),stroke:$(ConvertTo-MermaidCssColor $stroke),stroke-width:$strokeWidth,color:$mermaidText")
   }
 
   $target = if ($OpenLinksInNewWindow) { '_blank' } else { '_self' }
@@ -1579,6 +1582,9 @@ function New-NetworkMapMermaidArticle {
   }
 
   $mermaid = $diagram.ToString().Trim()
+  $legendBackground = ConvertTo-HtmlAttribute $BackgroundColor
+  $legendText = ConvertTo-HtmlAttribute $TextColor
+  $legendEdge = ConvertTo-HtmlAttribute $EdgeColor
   $typeLegendItems = foreach ($type in @('Zone','VLAN','Network','Asset','Address','Website')) {
     if (-not @($nodes.Values | Where-Object { $_.Type -eq $type })) { continue }
     $fill = if ($ColorByType -and $ColorByType.ContainsKey($type)) { $ColorByType[$type] } else {
@@ -1591,19 +1597,19 @@ function New-NetworkMapMermaidArticle {
         'Website' { $WebsiteColor }
       }
     }
-    "<span style=`"display:inline-flex;align-items:center;gap:6px;margin:0 8px 8px 0;padding:5px 9px;border:1px solid $(ConvertTo-HtmlAttribute (ConvertTo-MermaidCssColor $EdgeColor));border-radius:7px;background:#ffffff;color:$(ConvertTo-HtmlAttribute (ConvertTo-MermaidCssColor $TextColor '#111827'));font-size:12px;`"><span style=`"width:11px;height:11px;border-radius:3px;background:$(ConvertTo-HtmlAttribute (ConvertTo-MermaidCssColor $fill));display:inline-block;`"></span>$type</span>"
+    "<span style=`"display:inline-flex;align-items:center;gap:6px;margin:0 8px 8px 0;padding:5px 9px;border:1px solid $legendEdge;border-radius:7px;background:$legendBackground;color:$legendText;font-size:12px;`"><span style=`"width:11px;height:11px;border-radius:3px;background:$(ConvertTo-HtmlAttribute $fill);display:inline-block;`"></span>$type</span>"
   }
 
   $statusValues = @($nodes.Values | Where-Object { $_.Status } | ForEach-Object { $_.Status } | Sort-Object -Unique)
   $statusLegendItems = foreach ($status in $statusValues) {
     $color = if ($ColorByStatus -and $ColorByStatus.ContainsKey($status)) { $ColorByStatus[$status] } else { $EdgeColor }
-    "<span style=`"display:inline-flex;align-items:center;gap:6px;margin:0 8px 8px 0;padding:5px 9px;border:1px solid $(ConvertTo-HtmlAttribute (ConvertTo-MermaidCssColor $EdgeColor));border-radius:7px;background:#ffffff;color:$(ConvertTo-HtmlAttribute (ConvertTo-MermaidCssColor $TextColor '#111827'));font-size:12px;`"><span style=`"width:11px;height:11px;border-radius:999px;background:$(ConvertTo-HtmlAttribute (ConvertTo-MermaidCssColor $color));display:inline-block;`"></span>$(ConvertTo-HtmlText $status)</span>"
+    "<span style=`"display:inline-flex;align-items:center;gap:6px;margin:0 8px 8px 0;padding:5px 9px;border:1px solid $legendEdge;border-radius:7px;background:$legendBackground;color:$legendText;font-size:12px;`"><span style=`"width:11px;height:11px;border-radius:999px;background:$(ConvertTo-HtmlAttribute $color);display:inline-block;`"></span>$(ConvertTo-HtmlText $status)</span>"
   }
 
   $counts = @($nodes.Values | Group-Object Type | Sort-Object Name | ForEach-Object { "$($_.Name): $($_.Count)" }) -join ' &middot; '
   $generated = Get-Date -Format 'yyyy-MM-dd HH:mm'
   $legend = @"
-<div style="border:1px solid rgba(107,114,128,.35);border-radius:8px;padding:12px 14px;margin:0 0 12px 0;background:linear-gradient(180deg,rgba(255,255,255,.88),rgba(255,255,255,.72));color:$(ConvertTo-HtmlAttribute (ConvertTo-MermaidCssColor $TextColor '#111827'));font-family:Inter,Segoe UI,Arial,sans-serif;">
+<div style="border:1px solid $legendEdge;border-radius:8px;padding:12px 14px;margin:0 0 12px 0;background:$legendBackground;color:$legendText;font-family:Inter,Segoe UI,Arial,sans-serif;">
   <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap;">
     <div>
       <div style="font-size:18px;font-weight:700;line-height:1.2;">Network Map</div>

@@ -11,9 +11,15 @@
 [string]$Direction = 'LR' # 'TB', 'TD', 'BT', 'RL', 'LR'
 [int]$EdgeStrokeWidth = 3
 [int]$ExternalRelationThreshold = 25
-[int]$LargeMapSectionThreshold = 50
+[int]$LargeMapSectionThreshold = 40
+[int]$MinConnectedSectionSize = 5
+[bool]$OptimizeLayoutOrdering = $true
+[string]$MapBackgroundColor = '#f7f9fc'
+[string]$InCompanyNodeColor = '#e9f5ff'
+[string]$OutsideCompanyNodeColor = '#fff4e5'
 [string]$OutputDirectory = $(Join-Path $(resolve-path .\).Path 'output')
-[string[]]$ScopeObjectTypes = @('Asset', 'Article', 'AssetPassword', 'Procedure', 'Website', 'Company', 'Network', 'Vlan', 'VlanZone', 'IpAddress', 'RackStorage')
+[string[]]$ScopeObjectTypes = @('Asset', 'Article', 'AssetPassword', 'Procedure', 'Website', 'Company', 'Network', 'RackStorage')
+
 [string]$HuduBaseURL = $HuduBaseURL ?? $(read-host "please enter hudu base url")
 [string]$HuduAPIKey = $HuduAPIKey ?? $(read-host "please enter hudu api key");  clear-host;
 
@@ -25,9 +31,17 @@
 [bool]$EmbedAssetPasswordsInAssetNodes = $true
 [bool]$HideEmbeddedAssetPasswordRelationNodes = $true
 [int]$MaxEmbeddedAssetPasswords = 8
-
+[string]$AzVault_HuduSecretName = "HuduAPIKeySecretName"                 # Name of your secret in AZure Keystore for your Hudu API key
+[string]$AzVault_Name           = "MyVaultName"                          # Name of your Azure Keyvault
+[bool]$UseAZVault = $false
 Set-StrictMode -Version 3.0
 $script:RelateMapListCache = @{}
+
+if ($true -eq $UseAZVault) {
+  foreach ($module in @('Az.KeyVault')) {if (Get-Module -ListAvailable -Name $module) { Write-Host "Importing module, $module..."; Import-Module $module } else {Write-Host "Installing and importing module $module..."; Install-Module $module -Force -AllowClobber; Import-Module $module }}
+  if (-not (Get-AzContext)) { Connect-AzAccount };
+  $HuduAPIKey = "$(Get-AzKeyVaultSecret -VaultName "$AzVault_Name" -Name "$AzVault_HuduSecretName" -AsPlainText)"
+}
 
 function Get-PSVersionCompatible {
     param (
@@ -304,6 +318,25 @@ function Get-ObjectKey {
     return "$($Type.ToLowerInvariant())|$Id"
 }
 
+function New-RelationTypeScopeSet {
+    param([string[]]$Types)
+
+    $set = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+    foreach ($type in @($Types)) {
+        if ([string]::IsNullOrWhiteSpace($type)) { continue }
+
+        $cleanType = $type.Trim()
+        $null = $set.Add($cleanType)
+
+        switch ($cleanType) {
+            'AssetPassword' { $null = $set.Add('Password') }
+            'Password' { $null = $set.Add('AssetPassword') }
+        }
+    }
+
+    return $set
+}
+
 function ConvertTo-MermaidId {
     param(
         [Parameter(Mandatory)][string]$Value
@@ -525,7 +558,8 @@ function Resolve-RelationEndpointNode {
 function Get-RelationMapConnectedSections {
     param(
         [array]$Nodes,
-        [array]$Relations
+        [array]$Relations,
+        [int]$MinSectionSize = 1
     )
 
     $nodeByKey = @{}
@@ -581,6 +615,14 @@ function Get-RelationMapConnectedSections {
     $sectionByNodeKey = @{}
     $sectionIndex = 0
     foreach ($component in @($components | Sort-Object @{ Expression = 'Size'; Descending = $true }, SortName)) {
+        # Only components large enough to risk tangling get their own numbered
+        # section. Smaller components are intentionally left unsectioned so their
+        # nodes consolidate into shared per-layout "parent cards" (increasing
+        # magnetism between like-layout assets) instead of each spawning its own
+        # tiny section. Because these small components have no edges between one
+        # another, merging them by layout adds no new edge crossings.
+        if ($component.Size -lt $MinSectionSize) { continue }
+
         $sectionIndex++
         $section = [PSCustomObject]@{
             Index = $sectionIndex
@@ -594,7 +636,7 @@ function Get-RelationMapConnectedSections {
     }
 
     [PSCustomObject]@{
-        Count            = $components.Count
+        Count            = $sectionIndex
         SectionByNodeKey = $sectionByNodeKey
     }
 }
@@ -642,7 +684,13 @@ function Get-CompanyRelationGraph {
 
     Write-Host "Building relation graph for $($Company.name)..." -ForegroundColor Cyan
 
-    $assets = @(Get-HuduAssets -CompanyId $Company.id)
+    $scopeTypeSet = New-RelationTypeScopeSet -Types $ScopeObjectTypes
+
+    $assets = @(
+        if ($scopeTypeSet.Contains('Asset')) {
+            Get-HuduAssets -CompanyId $Company.id
+        }
+    )
     if (-not $IncludeArchived.IsPresent) {
         $assets = @($assets | Where-Object {
             (Get-HuduPropertyValue -Object $_ -Name 'archived' -DefaultValue $false) -ne $true -and
@@ -650,9 +698,13 @@ function Get-CompanyRelationGraph {
         })
     }
 
-    $articles = @(Get-HuduArticles -CompanyId $Company.id)
-    if ($IncludeGlobalKb.IsPresent) {
-        $articles += @(Get-HuduArticles | Where-Object { $null -eq (Get-HuduPropertyValue -Object $_ -Name 'company_id') })
+    $articles = @(
+        if ($scopeTypeSet.Contains('Article')) {
+            Get-HuduArticles -CompanyId $Company.id
+        }
+    )
+    if ($scopeTypeSet.Contains('Article') -and $IncludeGlobalKb.IsPresent) {
+        $articles = @($articles) + @(Get-HuduArticles | Where-Object { $null -eq (Get-HuduPropertyValue -Object $_ -Name 'company_id') })
     }
     $excludedArticleKeys = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
     foreach ($article in $articles) {
@@ -738,7 +790,16 @@ function Get-CompanyRelationGraph {
 
     $scopedRelations = [System.Collections.Generic.List[object]]::new()
     $externalRelations = [System.Collections.Generic.List[object]]::new()
+    $outOfScopeRelationsSkipped = 0
     foreach ($relation in $Relations) {
+        if (
+            -not $scopeTypeSet.Contains([string]$relation.fromable_type) -or
+            -not $scopeTypeSet.Contains([string]$relation.toable_type)
+        ) {
+            $outOfScopeRelationsSkipped++
+            continue
+        }
+
         $fromKey = Get-ObjectKey -Type $relation.fromable_type -Id $relation.fromable_id
         $toKey = Get-ObjectKey -Type $relation.toable_type -Id $relation.toable_id
         if ($excludedArticleKeys.Contains($fromKey) -or $excludedArticleKeys.Contains($toKey)) { continue }
@@ -769,7 +830,7 @@ function Get-CompanyRelationGraph {
         $scopedRelations.Count -lt $ExternalRelationThreshold
     )
 
-    if (-not $includeExternalRelations) {
+    if (-not $includeExternalRelations -and $externalRelations.Count -gt 0) {
         Write-Host "Skipping $($externalRelations.Count) external relation(s) for $($Company.name) because $($scopedRelations.Count) scoped relations meets/exceeds threshold $ExternalRelationThreshold." -ForegroundColor DarkYellow
     }
 
@@ -814,7 +875,100 @@ function Get-CompanyRelationGraph {
         ScopedRelationCount   = $scopedRelations.Count
         ExternalRelationCount = if ($includeExternalRelations) { $externalRelations.Count } else { 0 }
         ExternalRelationsSkipped = if ($includeExternalRelations) { 0 } else { $externalRelations.Count }
+        OutOfScopeRelationsSkipped = $outOfScopeRelationsSkipped
     }
+}
+
+function Get-RelationMapSeriationOrder {
+    # Assigns each unit (a card, or a node) a 1-D "pseudo-distance" coordinate
+    # that minimizes the weighted sum of squared line lengths between connected
+    # units: sum over edges of w_ij * (x_i - x_j)^2. The minimizer (subject to
+    # being non-constant) is the Fiedler vector -- the eigenvector of the
+    # second-smallest eigenvalue of the weighted graph Laplacian L = D - W.
+    # Exact Minimum Linear Arrangement is NP-hard; this spectral relaxation is
+    # the standard, well-behaved approximation and, unlike the mean-barycenter
+    # heuristic, does not oscillate.
+    #
+    # We avoid needing a matrix library by using shifted power iteration:
+    # iterating y = (c*I - L) x amplifies the smallest eigenvalues of L, and
+    # subtracting the mean each step deflates the trivial all-ones eigenvector
+    # (eigenvalue 0), so the iteration converges to the Fiedler vector. Units
+    # are then ranked by their coordinate, placing strongly connected units
+    # adjacent so relationship lines stay short and untangled.
+    param(
+        [Parameter(Mandatory)][string[]]$UnitKeys,
+        [Parameter(Mandatory)][hashtable]$Adjacency,
+        [int]$Iterations = 200
+    )
+
+    $n = $UnitKeys.Count
+    if ($n -le 2) {
+        $trivial = @{}
+        for ($i = 0; $i -lt $n; $i++) { $trivial[$UnitKeys[$i]] = [double]$i }
+        return $trivial
+    }
+
+    $index = @{}
+    for ($i = 0; $i -lt $n; $i++) { $index[$UnitKeys[$i]] = $i }
+
+    $degree = New-Object 'double[]' $n
+    $hasEdge = $false
+    foreach ($unit in $UnitKeys) {
+        $neighbors = $Adjacency[$unit]
+        if ($null -eq $neighbors) { continue }
+        $d = 0.0
+        foreach ($neighbor in $neighbors.Keys) {
+            if (-not $index.ContainsKey($neighbor)) { continue }
+            $d += [double]$neighbors[$neighbor]
+            $hasEdge = $true
+        }
+        $degree[$index[$unit]] = $d
+    }
+
+    if (-not $hasEdge) {
+        $order = @{}
+        for ($i = 0; $i -lt $n; $i++) { $order[$UnitKeys[$i]] = [double]$i }
+        return $order
+    }
+
+    $maxDegree = 0.0
+    for ($i = 0; $i -lt $n; $i++) { if ($degree[$i] -gt $maxDegree) { $maxDegree = $degree[$i] } }
+    $shift = (2.0 * $maxDegree) + 1.0
+
+    # Deterministic, non-constant starting vector so results are reproducible.
+    $x = New-Object 'double[]' $n
+    for ($i = 0; $i -lt $n; $i++) { $x[$i] = [math]::Sin($i + 1.0) }
+
+    for ($iter = 0; $iter -lt $Iterations; $iter++) {
+        $mean = 0.0
+        for ($i = 0; $i -lt $n; $i++) { $mean += $x[$i] }
+        $mean /= $n
+        for ($i = 0; $i -lt $n; $i++) { $x[$i] -= $mean }
+
+        # y = (shift*I - L) x = (shift - degree_i) * x_i + sum_j W_ij * x_j
+        $y = New-Object 'double[]' $n
+        for ($i = 0; $i -lt $n; $i++) { $y[$i] = ($shift - $degree[$i]) * $x[$i] }
+        foreach ($unit in $UnitKeys) {
+            $neighbors = $Adjacency[$unit]
+            if ($null -eq $neighbors) { continue }
+            $ui = $index[$unit]
+            foreach ($neighbor in $neighbors.Keys) {
+                if (-not $index.ContainsKey($neighbor)) { continue }
+                $y[$ui] += [double]$neighbors[$neighbor] * $x[$index[$neighbor]]
+            }
+        }
+
+        $norm = 0.0
+        for ($i = 0; $i -lt $n; $i++) { $norm += $y[$i] * $y[$i] }
+        $norm = [math]::Sqrt($norm)
+        if ($norm -le 1e-12) { break }
+        for ($i = 0; $i -lt $n; $i++) { $x[$i] = $y[$i] / $norm }
+    }
+
+    $positions = @{}
+    $sortedKeys = @($UnitKeys | Sort-Object @{ Expression = { $x[$index[$_]] } }, @{ Expression = { $index[$_] } })
+    for ($i = 0; $i -lt $sortedKeys.Count; $i++) { $positions[$sortedKeys[$i]] = [double]$i }
+    return $positions
 }
 
 function New-MermaidRelationMap {
@@ -825,10 +979,19 @@ function New-MermaidRelationMap {
         [int]$MaxEmbeddedAssetPasswords = 8,
         [string]$HuduBaseURL,
         [bool]$GroupLargeMapsByConnectedSection = $true,
-        [int]$LargeMapSectionThreshold = 50
+        [int]$LargeMapSectionThreshold = 40,
+        [int]$MinConnectedSectionSize = 1,
+        [bool]$OptimizeLayoutOrdering = $true,
+        [string]$MapBackgroundColor = '#f7f9fc',
+        [string]$InCompanyNodeColor = '#e9f5ff',
+        [string]$OutsideCompanyNodeColor = '#fff4e5'
     )
 
     $lines = [System.Collections.Generic.List[string]]::new()
+    if (-not [string]::IsNullOrWhiteSpace($MapBackgroundColor)) {
+        $safeBackgroundColor = ConvertTo-MermaidQuotedText -Value $MapBackgroundColor
+        $lines.Add("%%{init: {`"theme`": `"base`", `"themeVariables`": {`"background`": `"$safeBackgroundColor`"}} }}%%")
+    }
     $lines.Add("flowchart $Direction")
 
     if (-not $Graph.Nodes -or -not $Graph.Relations) {
@@ -845,11 +1008,21 @@ function New-MermaidRelationMap {
         )
     )
     $sectionInfo = if ($useConnectedSections) {
-        Get-RelationMapConnectedSections -Nodes @($Graph.Nodes) -Relations @($Graph.Relations)
+        Get-RelationMapConnectedSections -Nodes @($Graph.Nodes) -Relations @($Graph.Relations) -MinSectionSize $MinConnectedSectionSize
     } else {
         $null
     }
 
+    # Nodes are grouped by their "parent card": the object type, and for assets
+    # the asset layout (both already captured in $node.Category, e.g.
+    # "Asset: Firewall" / "Article" / "Website"). Scope (scoped / external /
+    # global) is deliberately excluded from the grouping key so that, for
+    # example, every Firewall lands in the same layout group regardless of which
+    # company owns it. Scope is still conveyed through node color and the
+    # company name appended to external node labels, so we drop the old scope
+    # prefixes from titles to keep the map readable. For large maps we still
+    # split into connected-component sections to keep the web untangled, but
+    # within each section the grouping remains type/layout based.
     $groupedNodes = foreach ($node in @($Graph.Nodes)) {
         $section = $null
         if (
@@ -861,37 +1034,105 @@ function New-MermaidRelationMap {
         }
 
         $sectionIndex = if ($null -ne $section -and $sectionInfo.Count -gt 1) { [int]$section.Index } else { 0 }
-        $title = if ($node.Scope -eq 'Scoped') {
-            $node.Category
-        } elseif ($node.Scope -eq 'Global') {
-            "Global $($node.Category)"
-        } else {
-            "External $($node.Category)"
-        }
-
-        if ($sectionIndex -gt 0) {
-            $title = "Section $sectionIndex - $title"
-        }
+        $title = if ($sectionIndex -gt 0) { "Section $sectionIndex - $($node.Category)" } else { $node.Category }
 
         [PSCustomObject]@{
             Node         = $node
-            GroupKey     = "$sectionIndex|$($node.Scope)|$($node.Category)"
-            SortKey      = ('{0:D4}|{1}|{2}' -f $sectionIndex, $node.Scope, $node.Category)
+            GroupKey     = "$sectionIndex|$($node.Category)"
+            SortKey      = ('{0:D4}|{1}' -f $sectionIndex, $node.Category)
             SectionIndex = $sectionIndex
             Title        = $title
         }
     }
 
+    $groupKeyByNodeKey = @{}
+    foreach ($groupedNode in $groupedNodes) {
+        $groupKeyByNodeKey[$groupedNode.Node.Key] = $groupedNode.GroupKey
+    }
+
+    # Start from a stable, human-friendly order (section, then category name).
     $groups = @($groupedNodes | Sort-Object SortKey, { $_.Node.Name }, { $_.Node.Id } | Group-Object -Property GroupKey)
+
+    # Pseudo-distance ordering: relationship lines are shortest and least
+    # tangled when strongly connected cards sit next to each other. We weight
+    # each pair of cards by the number of relations crossing between them and
+    # run a barycenter pass to seriate the cards, then emit them (and the nodes
+    # inside them) in that order so Mermaid/dagre lays them out accordingly.
+    # Sections stay contiguous because components never share cross-edges.
+    $nodeBary = @{}
+    if ($OptimizeLayoutOrdering -eq $true -and $groups.Count -gt 1) {
+        $initialGroupKeys = @($groups | ForEach-Object { $_.Name })
+
+        $groupAdjacency = @{}
+        foreach ($groupKey in $initialGroupKeys) { $groupAdjacency[$groupKey] = @{} }
+
+        foreach ($relation in $Graph.Relations) {
+            $fromKey = Get-ObjectKey -Type $relation.fromable_type -Id $relation.fromable_id
+            $toKey = Get-ObjectKey -Type $relation.toable_type -Id $relation.toable_id
+            if (-not $groupKeyByNodeKey.ContainsKey($fromKey) -or -not $groupKeyByNodeKey.ContainsKey($toKey)) { continue }
+
+            $fromGroup = $groupKeyByNodeKey[$fromKey]
+            $toGroup = $groupKeyByNodeKey[$toKey]
+            if ($fromGroup -eq $toGroup) { continue }
+
+            if (-not $groupAdjacency[$fromGroup].ContainsKey($toGroup)) { $groupAdjacency[$fromGroup][$toGroup] = 0 }
+            if (-not $groupAdjacency[$toGroup].ContainsKey($fromGroup)) { $groupAdjacency[$toGroup][$fromGroup] = 0 }
+            $groupAdjacency[$fromGroup][$toGroup]++
+            $groupAdjacency[$toGroup][$fromGroup]++
+        }
+
+        $groupPos = Get-RelationMapSeriationOrder -UnitKeys $initialGroupKeys -Adjacency $groupAdjacency
+
+        # Nudge each node toward the average position of the cards it links to,
+        # so nodes line up along the edge of their card facing their neighbors.
+        $nodeNeighborGroupPos = @{}
+        foreach ($relation in $Graph.Relations) {
+            $fromKey = Get-ObjectKey -Type $relation.fromable_type -Id $relation.fromable_id
+            $toKey = Get-ObjectKey -Type $relation.toable_type -Id $relation.toable_id
+            if (-not $groupKeyByNodeKey.ContainsKey($fromKey) -or -not $groupKeyByNodeKey.ContainsKey($toKey)) { continue }
+
+            foreach ($pair in @(, @($fromKey, $toKey)) + @(, @($toKey, $fromKey))) {
+                $selfKey = $pair[0]
+                $otherKey = $pair[1]
+                if (-not $nodeNeighborGroupPos.ContainsKey($selfKey)) {
+                    $nodeNeighborGroupPos[$selfKey] = [System.Collections.Generic.List[double]]::new()
+                }
+                $nodeNeighborGroupPos[$selfKey].Add([double]$groupPos[$groupKeyByNodeKey[$otherKey]])
+            }
+        }
+
+        foreach ($nodeKey in $nodeNeighborGroupPos.Keys) {
+            $values = $nodeNeighborGroupPos[$nodeKey]
+            if ($values.Count -eq 0) { continue }
+            $sum = 0.0
+            foreach ($value in $values) { $sum += $value }
+            $nodeBary[$nodeKey] = $sum / $values.Count
+        }
+
+        $groups = @($groups | Sort-Object `
+            @{ Expression = { [int]($_.Group[0].SectionIndex) } }, `
+            @{ Expression = { $groupPos[$_.Name] } }, `
+            @{ Expression = { $_.Group[0].Title } })
+    }
+
     foreach ($group in $groups) {
         $first = $group.Group | Select-Object -First 1
         $title = $first.Title
         $firstNode = $first.Node
 
-        $subgraphId = ConvertTo-MermaidId -Value "group_$($first.SectionIndex)_$($firstNode.Scope)_$($firstNode.Category)"
+        $subgraphId = ConvertTo-MermaidId -Value "group_$($first.SectionIndex)_$($firstNode.Category)"
         $lines.Add("    subgraph $subgraphId[`"$(ConvertTo-MermaidLabel -Value $title)`"]")
 
-        foreach ($groupedNode in @($group.Group | Sort-Object { $_.Node.Name }, { $_.Node.Id })) {
+        $orderedGroupNodes = if ($nodeBary.Count -gt 0) {
+            @($group.Group | Sort-Object `
+                @{ Expression = { if ($nodeBary.ContainsKey($_.Node.Key)) { $nodeBary[$_.Node.Key] } else { [double]::MaxValue } } }, `
+                @{ Expression = { $_.Node.Name } }, `
+                @{ Expression = { $_.Node.Id } })
+        } else {
+            @($group.Group | Sort-Object { $_.Node.Name }, { $_.Node.Id })
+        }
+
+        foreach ($groupedNode in $orderedGroupNodes) {
             $node = $groupedNode.Node
             $labelParts = @($node.Name)
             if ($node.Type -ieq 'Asset' -and -not [string]::IsNullOrWhiteSpace($node.AssetLayout)) {
@@ -975,8 +1216,8 @@ function New-MermaidRelationMap {
         $lines.Add("    linkStyle default stroke-width:${EdgeStrokeWidth}px;")
     }
 
-    $lines.Add("    classDef scoped fill:#e9f5ff,stroke:#3478bd,color:#102235")
-    $lines.Add("    classDef external fill:#fff4e5,stroke:#d97706,color:#3b2200")
+    $lines.Add("    classDef scoped fill:$InCompanyNodeColor,stroke:#3478bd,color:#102235")
+    $lines.Add("    classDef external fill:$OutsideCompanyNodeColor,stroke:#d97706,color:#3b2200")
     $lines.Add("    classDef global fill:#eef8ed,stroke:#39833b,color:#0f2f12")
 
     foreach ($node in $Graph.Nodes) {
@@ -1004,7 +1245,7 @@ function New-RelationMapArticleHtml {
         [Parameter(Mandatory)][object]$Graph,
         [Parameter(Mandatory)][string]$Mermaid,
         [bool]$GroupLargeMapsByConnectedSection = $true,
-        [int]$LargeMapSectionThreshold = 50
+        [int]$LargeMapSectionThreshold = 40
     )
 
     $generated = Get-Date -Format 'yyyy-MM-dd HH:mm:ss zzz'
@@ -1019,6 +1260,10 @@ function New-RelationMapArticleHtml {
         $summaryParts.Add("External related nodes were skipped because this company already has $($Graph.ScopedRelationCount) in-company relation records.")
     } elseif ((Get-HuduPropertyValue -Object $Graph -Name 'ExternalRelationCount' -DefaultValue 0) -gt 0) {
         $summaryParts.Add("Includes $($Graph.ExternalRelationCount) external relation record$(if ($Graph.ExternalRelationCount -eq 1) { '' } else { 's' }).")
+    }
+
+    if ((Get-HuduPropertyValue -Object $Graph -Name 'OutOfScopeRelationsSkipped' -DefaultValue 0) -gt 0) {
+        $summaryParts.Add("Skipped $($Graph.OutOfScopeRelationsSkipped) relation record$(if ($Graph.OutOfScopeRelationsSkipped -eq 1) { '' } else { 's' }) involving object types outside ScopeObjectTypes.")
     }
 
     if (
@@ -1047,7 +1292,8 @@ $source
 function New-RelationMapStandaloneHtml {
     param(
         [Parameter(Mandatory)][object]$Graph,
-        [Parameter(Mandatory)][string]$ArticleHtml
+        [Parameter(Mandatory)][string]$ArticleHtml,
+        [string]$MapBackgroundColor = '#f7f9fc'
     )
 
     $title = ConvertTo-HtmlText -Value "Relation Map - $($Graph.Company.name)"
@@ -1060,9 +1306,9 @@ function New-RelationMapStandaloneHtml {
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>$title</title>
   <style>
-    body { margin: 24px; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #172033; background: #f7f9fc; }
+    body { margin: 24px; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #172033; background: $MapBackgroundColor; }
     main { max-width: 1400px; margin: 0 auto; }
-    pre { overflow: auto; background: #ffffff; border: 1px solid #d7deea; border-radius: 8px; padding: 16px; }
+    pre { overflow: auto; background: $MapBackgroundColor; border: 1px solid #d7deea; border-radius: 8px; padding: 16px; }
     details { margin-top: 24px; }
   </style>
 </head>
@@ -1118,11 +1364,14 @@ function Publish-RelationMapArticle {
 Get-PSVersionCompatible; Get-HuduModule; Set-HuduInstance -HuduAPIKey $huduapikey -HuduBaseURL $HuduBaseURL; Get-HuduVersionCompatible;
 
 New-Item -Path $OutputDirectory -ItemType Directory -Force | Out-Null
+[string[]]$AllLobjectTypes = @('Asset', 'Article', 'AssetPassword', 'Procedure', 'Website', 'Company', 'Network', 'RackStorage', 'Vlan', 'VlanZone', 'IpAddress')
+$SkippedObjectTypes = @($AllLobjectTypes | Where-Object { $_ -notin $ScopeObjectTypes })
 
-Write-Host "Loading companies, asset layouts, and relations..." -ForegroundColor Cyan
-$companies = @(Get-HuduCompanies)
-$layouts = @(Get-HuduAssetLayouts)
-$relations = @(Get-HuduRelations)
+Write-Host "Loading companies" -ForegroundColor Cyan; $companies = @(Get-HuduCompanies);
+Write-Host "Loading asset layouts" -ForegroundColor Cyan; $layouts = @(Get-HuduAssetLayouts);
+Write-Host "Loading loading relations for relating to $($ScopeObjectTypes -join ', ')..." -ForegroundColor Cyan; $relations = @(Get-HuduRelations);
+Write-Host "$(if ($SkippedObjectTypes.count -gt 0) {"Skipping Object Types: $($SkippedObjectTypes -join ', ')"} else {'No skipped object types'})" -ForegroundColor darkcyan
+
 
 $companyById = @{}
 foreach ($company in $companies) {
@@ -1169,13 +1418,18 @@ $results = foreach ($company in $selectedCompanies) {
         -MaxEmbeddedAssetPasswords $MaxEmbeddedAssetPasswords `
         -HuduBaseURL $HuduBaseURL `
         -GroupLargeMapsByConnectedSection $GroupLargeMapsByConnectedSection `
-        -LargeMapSectionThreshold $LargeMapSectionThreshold
+        -LargeMapSectionThreshold $LargeMapSectionThreshold `
+        -MinConnectedSectionSize $MinConnectedSectionSize `
+        -OptimizeLayoutOrdering $OptimizeLayoutOrdering `
+        -MapBackgroundColor $MapBackgroundColor `
+        -InCompanyNodeColor $InCompanyNodeColor `
+        -OutsideCompanyNodeColor $OutsideCompanyNodeColor
     $articleHtml = New-RelationMapArticleHtml `
         -Graph $graph `
         -Mermaid $mermaid `
         -GroupLargeMapsByConnectedSection $GroupLargeMapsByConnectedSection `
         -LargeMapSectionThreshold $LargeMapSectionThreshold
-        $standaloneHtml = New-RelationMapStandaloneHtml -Graph $graph -ArticleHtml $articleHtml
+        $standaloneHtml = New-RelationMapStandaloneHtml -Graph $graph -ArticleHtml $articleHtml -MapBackgroundColor $MapBackgroundColor
     $fileBase = Get-SafeFileName -Name "$($company.name)-relation-map"
     $mmdPath = Join-Path $OutputDirectory "$fileBase.mmd"
     $htmlPath = Join-Path $OutputDirectory "$fileBase.html"
@@ -1195,11 +1449,16 @@ $results = foreach ($company in $selectedCompanies) {
         ScopedRelations = $graph.ScopedRelationCount
         ExternalRelations = $graph.ExternalRelationCount
         ExternalSkipped = $graph.ExternalRelationsSkipped
+        OutOfScopeSkipped = $graph.OutOfScopeRelationsSkipped
         MermaidPath   = $mmdPath
         HtmlPath      = $htmlPath
         ArticleName   = "$ArticleNamePrefix$($company.name)"
         ArticleSynced = $PublishArticles
     }
+}
+Set-StrictMode -Off
+if ($true -eq $PublishArticles){
+    remove-item -path "$OutputDirectory\*" -force -ErrorAction SilentlyContinue
 }
 
 $results
