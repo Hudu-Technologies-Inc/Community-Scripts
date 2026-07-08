@@ -1759,6 +1759,7 @@ function Test-Equiv {
 }
 
 function Set-HuduInstance {
+    param ([string]$HuduBaseURL, [string]$HuduAPIKey)
     $HuduBaseURL = $HuduBaseURL ?? 
         $((Read-Host -Prompt 'Set the base domain of your Hudu instance (e.g https://myinstance.huducloud.com)') -replace '[\\/]+$', '') -replace '^(?!https://)', 'https://'
     $HuduAPIKey = $HuduAPIKey ?? "$(read-host "Please Enter Hudu API Key")"
@@ -1811,7 +1812,7 @@ if ($HuduBaseURL -eq "https://YourHuduUrl.huducloud.com"){
 }
 
 
-Get-PSVersionCompatible; Get-HuduModule; Set-HuduInstance; Get-HuduVersionCompatible -requiredVersion $(if ($NetworkMapOutputFormat -eq "Mermaid") { "2.43.0" } else { "2.39.2" });
+Get-PSVersionCompatible; Get-HuduModule; Set-HuduInstance -HuduBaseURL $HuduBaseURL -HuduAPIKey $HuduAPIKey; Get-HuduVersionCompatible -requiredVersion $(if ($NetworkMapOutputFormat -eq "Mermaid") { "2.43.0" } else { "2.39.2" });
 $IconHrefByType = @{}
 if ($NetworkMapOutputFormat -eq "SvgHtml") {
   $attributableArticle = Get-HuduArticles -name "Network Maps Icons" | select-object -first 1

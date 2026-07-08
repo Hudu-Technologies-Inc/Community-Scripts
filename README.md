@@ -27,9 +27,10 @@ Collection of Hudu Community Scripts for anyone to use/run/remix/reference.
 - **Information and Visualization**
   - [Endpoint Self-Reporting](Information-and-Visualization/Endpoint-Self-Reporting/)
   - [Mapbox Locations Maps](Information-and-Visualization/Mapbox-Loctions-Maps/)
-  - [Network Maps Articles](Information-and-Visualization/Network-Maps-Articles/)
   - [Integrations Tracking](Information-and-Visualization/Integrations-Tracking/)
   - [Managing Magic Dashes](Information-and-Visualization/Managing-MagicDashes/)
+  - [(Mermaid Chart) Network Maps](Information-and-Visualization/Network-Maps-Articles/)
+  - [(Mermaid Chart) Relationship Charts](Information-and-Visualization/Relation-Charts/)
 
 
 - **Migrations**

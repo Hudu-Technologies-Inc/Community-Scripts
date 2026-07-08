@@ -7,6 +7,18 @@ Well, this makes doing so easy, customizable, and effortless! While fairly basic
 
 An article is either created or updated (if it already exists) for each network described in each company. A Highest-Level / overview network will also be created, if applicable.
 
+```powershell
+$huduBaseURL = "myinstance.huducloud.com";
+irm 'https://raw.githubusercontent.com/Hudu-Technologies-Inc/Community-Scripts/refs/heads/main/Information-And-Visualization/Relation-Charts/Relation-Charts.ps1' | iex
+```
+
+
+### Mermaid Chart Output ***(default)***
+
+
+
+### SVGHtml Output ***(legacy)***
+
 <img width="3050" height="1246" alt="image" src="https://github.com/user-attachments/assets/24c4f29d-46c4-4b88-9188-32f736bed5e3" />
 
 ## Setup
@@ -16,6 +28,14 @@ Setup is pretty easy. You have various customization options, but the meat and b
 To run once or to test it out, you'll want to make sure that your `$HuduBaseURL` is set. Interactive use doesn't need a secrets provider, so you will be asked for your Hudu API key when running in this fashion.
 
 <img width="1098" height="172" alt="image" src="https://github.com/user-attachments/assets/ea9bb684-6816-428d-bec9-33e2e50c1e14" />
+
+## Quick-Start One-liner
+
+```powershell
+$huduBaseURL = "myinstance.huducloud.com";
+irm 'https://raw.githubusercontent.com/Hudu-Technologies-Inc/Community-Scripts/refs/heads/main/Information-And-Visualization/Netowrk-Maps-Articles/Network-Maps.ps1' | iex
+```
+
 
 ## Run on a schedule
 If you'd prefer that this runs on a schedule or non-interactively to always give you the most up-to-date network maps, it's recommended that you use an Azure KeyVault for storing your Hudu API key. To enable this, you'll need to make sure $UseAZVault is set to $true, as well as setting your KeyVault name and Hudu API Key secret name. Also, you'll still want to make sure your $HuduBaseURL value is set.
@@ -81,6 +101,7 @@ Main Entities Mapped:
 - Matched Hudu Websites are shown after IP Addresses when website linking is enabled (Purple)
 
 WAN Networks and Public IP Ranges/Blocks are supported here. Really, anything that is IPV4 is supported!
+
 
 <img width="2454" height="344" alt="image" src="https://github.com/user-attachments/assets/35ec533b-5b86-48e0-a6cd-a010cb030b13" />
 
