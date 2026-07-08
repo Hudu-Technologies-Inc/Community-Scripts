@@ -5,7 +5,7 @@
 Have you ever wanted to visualize all your networks in Hudu as an interactive network map?
 Well, this makes doing so easy, customizable, and effortless! While fairly basic in design, it can make things much easier for our friends to conceptualize a network's topography.
 
-An article is either created or updated (if it already exists) for each network described in each company. A Highest-Level / overview network will also be created, if applicable.
+An article is either created or updated with related networks, vlans, zones, addressees, (and now websites)
 
 ```powershell
 $huduBaseURL = "myinstance.huducloud.com";
@@ -15,6 +15,9 @@ irm 'https://raw.githubusercontent.com/Hudu-Technologies-Inc/Community-Scripts/r
 
 ### Mermaid Chart Output ***(default)***
 
+<img width="652" height="263" alt="image" src="https://github.com/user-attachments/assets/e49fc916-3504-4134-a081-e0d62be243d7" />
+
+<img width="1334" height="998" alt="image" src="https://github.com/user-attachments/assets/dcb2700d-267e-4a82-a582-139d0e948461" />
 
 
 ### SVGHtml Output ***(legacy)***
@@ -159,4 +162,4 @@ You can also change the card color for each individual entity in the same way, i
 
 ## History
 
-July 8, 2026 - Added support for Mermaid Charts on network maps.
+July 8, 2026 - Added support for Mermaid Charts on network maps. Also added website-attachment for public-facing IP addresses that match a website in same-company.
