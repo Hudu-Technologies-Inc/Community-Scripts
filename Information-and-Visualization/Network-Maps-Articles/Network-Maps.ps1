@@ -776,10 +776,11 @@ function Find-HuduNetworkMapArticle {
   param(
     [Parameter(Mandatory)]$Network,
     [Parameter(Mandatory)][string]$ArticleName,
-    [Parameter(Mandatory)][object[]]$CompanyArticles,
+    [AllowNull()][AllowEmptyCollection()][object[]]$CompanyArticles = @(),
     [AllowNull()][string[]]$LegacyNames = @()
   )
 
+  $CompanyArticles = @($CompanyArticles)
   $normalizedArticleName = Normalize-ArticleTitle $ArticleName
   $matches = @($CompanyArticles | Where-Object { (Normalize-ArticleTitle $_.name) -eq $normalizedArticleName })
 
@@ -1993,7 +1994,7 @@ foreach ($network in $allNetworks) {
     Write-Host "Wrote $articleName to $htmlPath"
   }
 
-  $companyArticles = Get-CachedHuduCompanyArticles -CompanyId $network.company_id -Cache $ArticlesByCompanyId
+  $companyArticles = @(Get-CachedHuduCompanyArticles -CompanyId $network.company_id -Cache $ArticlesByCompanyId)
   $article = Find-HuduNetworkMapArticle `
     -Network $network `
     -ArticleName $articleName `
@@ -2017,7 +2018,7 @@ foreach ($network in $allNetworks) {
   } catch {
     Write-Error "$(if ($article) {"Error Updating Article $($article.id) $_"} else {"Error creating article $articleName $_"})"
   }
-  try{if (get-command -name "Set-HapiErrorsDirectory"){
+  try{if (get-command -name "Set-HapiErrorsDirectory" -and $null -ne $network.id -and $null -ne $articleRequest.id) {
     Set-HapiErrorsDirectory -skipRetry $true | out-null
     new-hudurelation -toable_type "Article" -toable_id $articleRequest.id -fromable_type "Network" -fromable_id $network.id | out-null
     Set-HapiErrorsDirectory -skipRetry $false | out-null
