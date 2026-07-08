@@ -2,6 +2,8 @@
 
 [original community post, Oct 2025](https://community.hudu.com/script-library-awpwerdu/post/interactive-network-maps-from-ipam-networks-vlans-zones-EE1U7wvi0j0uO8Q)
 
+[community post from Mermaid Update, Jul 8 2026](https://community.hudu.com/script-library-awpwerdu/post/feature-spotlight---mermaid-charts-in-hudu-hl70JiMiEesM8H5)
+
 Have you ever wanted to visualize all your networks in Hudu as an interactive network map?
 Well, this makes doing so easy, customizable, and effortless! While fairly basic in design, it can make things much easier for our friends to conceptualize a network's topography.
 
