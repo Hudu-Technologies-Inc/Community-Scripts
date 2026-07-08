@@ -1457,8 +1457,10 @@ $results = foreach ($company in $selectedCompanies) {
     }
 }
 Set-StrictMode -Off
+
 if ($true -eq $PublishArticles){
-    remove-item -path "$OutputDirectory\*" -force -ErrorAction SilentlyContinue
+    try{remove-item -path "$OutputDirectory\*" -force -ErrorAction SilentlyContinue} catch {}
 }
+$HuduAPIKey = $null
 
 $results

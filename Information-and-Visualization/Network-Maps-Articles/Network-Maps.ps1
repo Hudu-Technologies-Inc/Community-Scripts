@@ -1281,7 +1281,17 @@ function ConvertTo-MermaidLabelText {
     -replace '&','&amp;' `
     -replace '<','&lt;' `
     -replace '>','&gt;' `
+    -replace '\\','\\' `
     -replace '"',"'"`
+    -replace '\r?\n',' '
+}
+
+function ConvertTo-MermaidQuotedText {
+  param([AllowNull()]$Text)
+  if ($null -eq $Text) { return '' }
+  return "$Text" `
+    -replace '\\','\\' `
+    -replace '"','\"' `
     -replace '\r?\n',' '
 }
 
@@ -1577,8 +1587,9 @@ function New-NetworkMapMermaidArticle {
 
   $target = if ($OpenLinksInNewWindow) { '_blank' } else { '_self' }
   foreach ($node in @($nodes.Values | Where-Object { $_.Url })) {
-    $tooltip = ConvertTo-MermaidLabelText "$($node.Type): $($node.Label)"
-    [void]$diagram.AppendLine("  click $($node.Id) `"$($node.Url)`" `"$tooltip`" $target")
+    $url = ConvertTo-MermaidQuotedText $node.Url
+    $tooltip = ConvertTo-MermaidQuotedText "$($node.Type): $($node.Label)"
+    [void]$diagram.AppendLine("  click $($node.Id) href `"$url`" `"$tooltip`" $target")
   }
 
   $mermaid = $diagram.ToString().Trim()
@@ -2006,6 +2017,12 @@ foreach ($network in $allNetworks) {
   } catch {
     Write-Error "$(if ($article) {"Error Updating Article $($article.id) $_"} else {"Error creating article $articleName $_"})"
   }
+  try{if (get-command -name "Set-HapiErrorsDirectory"){
+    Set-HapiErrorsDirectory -skipRetry $true | out-null
+    new-hudurelation -toable_type "Article" -toable_id $articleRequest.id -fromable_type "Network" -fromable_id $network.id | out-null
+    Set-HapiErrorsDirectory -skipRetry $false | out-null
+  }} catch {}
+
 }
 $HuduAPIKey = $null
 
