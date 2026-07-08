@@ -9,7 +9,7 @@
 Visualizing your locations, networking hardware, and virtual/physical devices can be tricky. What if there were a way to turn all of that into simple, readable [Mermaid](https://mermaid.js.org/) charts?
 
 
-`build-relate-maps.ps1` builds one relation graph per company in your Hudu instance. It uses each company's own assets and articles as the starting scope, then pulls in every relation that touches those objects. Related objects that live in other companies are kept on the chart as external nodes, so cross-company relationships stay visible.
+`Relation-Charts.ps1` builds one relation graph per company in your Hudu instance. It uses each company's own assets and articles as the starting scope, then pulls in every relation that touches those objects. Related objects that live in other companies are kept on the chart as external nodes, so cross-company relationships stay visible.
 
 For every company it produces:
 
@@ -79,7 +79,7 @@ Relationship lines stay shortest and least tangled when strongly connected cards
 
 ## Setup
 
-Setup is easy. There are lots of customization options, but the essentials are preconfigured for a good general experience. Edit the variables at the top of `build-relate-maps.ps1` to adjust behavior.
+Setup is easy. There are lots of customization options, but the essentials are preconfigured for a good general experience. Edit the variables at the top of `Relation-Charts.ps1` to adjust behavior.
 
 ### Chart appearance
 
@@ -119,7 +119,7 @@ Setup is easy. There are lots of customization options, but the essentials are p
 To run once or to try it out, just execute the script. You'll be prompted for anything that's needed — mainly your Hudu base URL and Hudu API key.
 
 ```powershell
-./build-relate-maps.ps1
+./Relation-Charts.ps1
 ```
 
 ## Run on a schedule
