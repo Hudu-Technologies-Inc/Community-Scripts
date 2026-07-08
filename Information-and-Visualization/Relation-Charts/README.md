@@ -52,7 +52,7 @@ You can clone this repository, download the zip for this repository and launch t
 
 ```powershell
 $huduBaseURL = "myinstance.huducloud.com";
-irm 'https://raw.githubusercontent.com/Hudu-Technologies-Inc/Community-Scripts/refs/heads/main/Information-And-Visualization/Relation-Charts/Relation-Charts.ps1' | iex
+irm 'https://raw.githubusercontent.com/Hudu-Technologies-Inc/Community-Scripts/refs/heads/main/Information-and-Visualization/Relation-Charts/Relation-Charts.ps1' | iex
 ```
 
 ## How nodes are grouped
