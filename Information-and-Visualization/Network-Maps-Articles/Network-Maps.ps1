@@ -48,7 +48,7 @@ $CurvyEdges = $true # Use Bézier curves or straight lines when drawing relation
 $SaveHTML=$false # Save a copy of network HTML to local directory
 
 $NetworkArticleNamingPrefix = ""
-$NetworkArticleNamingSuffix = "$NetworkMapOutputFormat Chart"
+$NetworkArticleNamingSuffix = "$NetworkMapOutputFormat Network Chart"
 $NetworkArticleTitleMaxLength = 120
 $NetworkArticleIncludeId = $true
 
@@ -772,14 +772,55 @@ function Update-CachedHuduCompanyArticle {
   $Cache[$key] = @($existing + $core)
 }
 
+function Add-HuduNetworkMapArticleRelation {
+  param(
+    [Parameter(Mandatory)]$Network,
+    [Parameter(Mandatory)]$Article
+  )
+
+  if (-not (Get-Command -Name New-HuduRelation -ErrorAction SilentlyContinue)) {
+    return
+  }
+
+  $coreArticle = Get-HuduArticleCore $Article
+  if ($null -eq $coreArticle -or $null -eq $coreArticle.id -or $null -eq $Network.id) {
+    Write-Warning "Could not create network map relation because the network id or article id was unavailable."
+    return
+  }
+
+  $setHapiErrorsDirectory = Get-Command -Name Set-HapiErrorsDirectory -ErrorAction SilentlyContinue
+  try {
+    if ($setHapiErrorsDirectory) {
+      Set-HapiErrorsDirectory -skipRetry $true | Out-Null
+    }
+
+    New-HuduRelation `
+      -FromableType "Network" `
+      -FromableID ([int]$Network.id) `
+      -ToableType "Article" `
+      -ToableID ([int]$coreArticle.id) `
+      -ErrorAction Stop | Out-Null
+  } catch {
+    $message = "$($_.Exception.Message)"
+    if ($message -notmatch '(?i)(already|duplicate|exists|taken)') {
+      Write-Warning "Could not create relation from Network $($Network.id) to Article $($coreArticle.id): $message"
+    }
+  } finally {
+    if ($setHapiErrorsDirectory) {
+      Set-HapiErrorsDirectory -skipRetry $false | Out-Null
+    }
+  }
+}
+
 function Find-HuduNetworkMapArticle {
   param(
     [Parameter(Mandatory)]$Network,
     [Parameter(Mandatory)][string]$ArticleName,
-    [Parameter(Mandatory)][object[]]$CompanyArticles,
+    [AllowNull()][AllowEmptyCollection()][object[]]$CompanyArticles = @(),
     [AllowNull()][string[]]$LegacyNames = @()
   )
 
+  $CompanyArticles = @($CompanyArticles)
   $normalizedArticleName = Normalize-ArticleTitle $ArticleName
   $matches = @($CompanyArticles | Where-Object { (Normalize-ArticleTitle $_.name) -eq $normalizedArticleName })
 
@@ -1281,7 +1322,17 @@ function ConvertTo-MermaidLabelText {
     -replace '&','&amp;' `
     -replace '<','&lt;' `
     -replace '>','&gt;' `
+    -replace '\\','\\' `
     -replace '"',"'"`
+    -replace '\r?\n',' '
+}
+
+function ConvertTo-MermaidQuotedText {
+  param([AllowNull()]$Text)
+  if ($null -eq $Text) { return '' }
+  return "$Text" `
+    -replace '\\','\\' `
+    -replace '"','\"' `
     -replace '\r?\n',' '
 }
 
@@ -1500,7 +1551,10 @@ function New-NetworkMapMermaidArticle {
 
   $diagram = New-Object System.Text.StringBuilder
   $curve = if ($CurvyEdges) { 'basis' } else { 'linear' }
-  [void]$diagram.AppendLine("%%{init: {`"flowchart`": {`"htmlLabels`": true, `"curve`": `"$curve`"}, `"theme`": `"base`", `"themeVariables`": {`"lineColor`": `"$(ConvertTo-MermaidCssColor $EdgeColor)`", `"primaryTextColor`": `"$(ConvertTo-MermaidCssColor $TextColor '#111827')`", `"fontFamily`": `"Inter, Segoe UI, Arial, sans-serif`"}}}%%")
+  $mermaidBackground = ConvertTo-MermaidCssColor $BackgroundColor '#ffffff'
+  $mermaidText = ConvertTo-MermaidCssColor $TextColor '#111827'
+  $mermaidEdge = ConvertTo-MermaidCssColor $EdgeColor '#6b7280'
+  [void]$diagram.AppendLine("%%{init: {`"flowchart`": {`"htmlLabels`": true, `"curve`": `"$curve`"}, `"theme`": `"base`", `"themeVariables`": {`"background`": `"$mermaidBackground`", `"mainBkg`": `"$mermaidBackground`", `"clusterBkg`": `"$mermaidBackground`", `"clusterBorder`": `"$mermaidEdge`", `"primaryBorderColor`": `"$mermaidEdge`", `"lineColor`": `"$mermaidEdge`", `"primaryTextColor`": `"$mermaidText`", `"titleColor`": `"$mermaidText`", `"fontFamily`": `"Inter, Segoe UI, Arial, sans-serif`"}}}%%")
   [void]$diagram.AppendLine("flowchart $Direction")
 
   $typeLabels = @{
@@ -1544,7 +1598,7 @@ function New-NetworkMapMermaidArticle {
       }
     }
     $fill = ConvertTo-MermaidCssColor $fill
-    [void]$diagram.AppendLine("  classDef $type fill:$fill,stroke:$(ConvertTo-MermaidCssColor $EdgeColor),stroke-width:1px,color:$(ConvertTo-MermaidCssColor $TextColor '#111827');")
+    [void]$diagram.AppendLine("  classDef $type fill:$fill,stroke:$mermaidEdge,stroke-width:1px,color:$mermaidText;")
     $ids = @($nodes.Values | Where-Object { $_.Type -eq $type } | ForEach-Object { $_.Id })
     if ($ids.Count -gt 0) {
       [void]$diagram.AppendLine("  class $($ids -join ',') $type;")
@@ -1569,16 +1623,20 @@ function New-NetworkMapMermaidArticle {
       $EdgeColor
     }
     $strokeWidth = if ($status) { '4px' } else { '1px' }
-    [void]$diagram.AppendLine("  style $($node.Id) fill:$(ConvertTo-MermaidCssColor $fill),stroke:$(ConvertTo-MermaidCssColor $stroke),stroke-width:$strokeWidth,color:$(ConvertTo-MermaidCssColor $TextColor '#111827')")
+    [void]$diagram.AppendLine("  style $($node.Id) fill:$(ConvertTo-MermaidCssColor $fill),stroke:$(ConvertTo-MermaidCssColor $stroke),stroke-width:$strokeWidth,color:$mermaidText")
   }
 
   $target = if ($OpenLinksInNewWindow) { '_blank' } else { '_self' }
   foreach ($node in @($nodes.Values | Where-Object { $_.Url })) {
-    $tooltip = ConvertTo-MermaidLabelText "$($node.Type): $($node.Label)"
-    [void]$diagram.AppendLine("  click $($node.Id) `"$($node.Url)`" `"$tooltip`" $target")
+    $url = ConvertTo-MermaidQuotedText $node.Url
+    $tooltip = ConvertTo-MermaidQuotedText "$($node.Type): $($node.Label)"
+    [void]$diagram.AppendLine("  click $($node.Id) href `"$url`" `"$tooltip`" $target")
   }
 
   $mermaid = $diagram.ToString().Trim()
+  $legendBackground = ConvertTo-HtmlAttribute $BackgroundColor
+  $legendText = ConvertTo-HtmlAttribute $TextColor
+  $legendEdge = ConvertTo-HtmlAttribute $EdgeColor
   $typeLegendItems = foreach ($type in @('Zone','VLAN','Network','Asset','Address','Website')) {
     if (-not @($nodes.Values | Where-Object { $_.Type -eq $type })) { continue }
     $fill = if ($ColorByType -and $ColorByType.ContainsKey($type)) { $ColorByType[$type] } else {
@@ -1591,19 +1649,19 @@ function New-NetworkMapMermaidArticle {
         'Website' { $WebsiteColor }
       }
     }
-    "<span style=`"display:inline-flex;align-items:center;gap:6px;margin:0 8px 8px 0;padding:5px 9px;border:1px solid $(ConvertTo-HtmlAttribute (ConvertTo-MermaidCssColor $EdgeColor));border-radius:7px;background:#ffffff;color:$(ConvertTo-HtmlAttribute (ConvertTo-MermaidCssColor $TextColor '#111827'));font-size:12px;`"><span style=`"width:11px;height:11px;border-radius:3px;background:$(ConvertTo-HtmlAttribute (ConvertTo-MermaidCssColor $fill));display:inline-block;`"></span>$type</span>"
+    "<span style=`"display:inline-flex;align-items:center;gap:6px;margin:0 8px 8px 0;padding:5px 9px;border:1px solid $legendEdge;border-radius:7px;background:$legendBackground;color:$legendText;font-size:12px;`"><span style=`"width:11px;height:11px;border-radius:3px;background:$(ConvertTo-HtmlAttribute $fill);display:inline-block;`"></span>$type</span>"
   }
 
   $statusValues = @($nodes.Values | Where-Object { $_.Status } | ForEach-Object { $_.Status } | Sort-Object -Unique)
   $statusLegendItems = foreach ($status in $statusValues) {
     $color = if ($ColorByStatus -and $ColorByStatus.ContainsKey($status)) { $ColorByStatus[$status] } else { $EdgeColor }
-    "<span style=`"display:inline-flex;align-items:center;gap:6px;margin:0 8px 8px 0;padding:5px 9px;border:1px solid $(ConvertTo-HtmlAttribute (ConvertTo-MermaidCssColor $EdgeColor));border-radius:7px;background:#ffffff;color:$(ConvertTo-HtmlAttribute (ConvertTo-MermaidCssColor $TextColor '#111827'));font-size:12px;`"><span style=`"width:11px;height:11px;border-radius:999px;background:$(ConvertTo-HtmlAttribute (ConvertTo-MermaidCssColor $color));display:inline-block;`"></span>$(ConvertTo-HtmlText $status)</span>"
+    "<span style=`"display:inline-flex;align-items:center;gap:6px;margin:0 8px 8px 0;padding:5px 9px;border:1px solid $legendEdge;border-radius:7px;background:$legendBackground;color:$legendText;font-size:12px;`"><span style=`"width:11px;height:11px;border-radius:999px;background:$(ConvertTo-HtmlAttribute $color);display:inline-block;`"></span>$(ConvertTo-HtmlText $status)</span>"
   }
 
   $counts = @($nodes.Values | Group-Object Type | Sort-Object Name | ForEach-Object { "$($_.Name): $($_.Count)" }) -join ' &middot; '
   $generated = Get-Date -Format 'yyyy-MM-dd HH:mm'
   $legend = @"
-<div style="border:1px solid rgba(107,114,128,.35);border-radius:8px;padding:12px 14px;margin:0 0 12px 0;background:linear-gradient(180deg,rgba(255,255,255,.88),rgba(255,255,255,.72));color:$(ConvertTo-HtmlAttribute (ConvertTo-MermaidCssColor $TextColor '#111827'));font-family:Inter,Segoe UI,Arial,sans-serif;">
+<div style="border:1px solid $legendEdge;border-radius:8px;padding:12px 14px;margin:0 0 12px 0;background:$legendBackground;color:$legendText;font-family:Inter,Segoe UI,Arial,sans-serif;">
   <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap;">
     <div>
       <div style="font-size:18px;font-weight:700;line-height:1.2;">Network Map</div>
@@ -1759,6 +1817,7 @@ function Test-Equiv {
 }
 
 function Set-HuduInstance {
+    param ([string]$HuduBaseURL, [string]$HuduAPIKey)
     $HuduBaseURL = $HuduBaseURL ?? 
         $((Read-Host -Prompt 'Set the base domain of your Hudu instance (e.g https://myinstance.huducloud.com)') -replace '[\\/]+$', '') -replace '^(?!https://)', 'https://'
     $HuduAPIKey = $HuduAPIKey ?? "$(read-host "Please Enter Hudu API Key")"
@@ -1811,7 +1870,7 @@ if ($HuduBaseURL -eq "https://YourHuduUrl.huducloud.com"){
 }
 
 
-Get-PSVersionCompatible; Get-HuduModule; Set-HuduInstance; Get-HuduVersionCompatible -requiredVersion $(if ($NetworkMapOutputFormat -eq "Mermaid") { "2.43.0" } else { "2.39.2" });
+Get-PSVersionCompatible; Get-HuduModule; Set-HuduInstance -HuduBaseURL $HuduBaseURL -HuduAPIKey $HuduAPIKey; Get-HuduVersionCompatible -requiredVersion $(if ($NetworkMapOutputFormat -eq "Mermaid") { "2.43.0" } else { "2.39.2" });
 $IconHrefByType = @{}
 if ($NetworkMapOutputFormat -eq "SvgHtml") {
   $attributableArticle = Get-HuduArticles -name "Network Maps Icons" | select-object -first 1
@@ -1975,7 +2034,7 @@ foreach ($network in $allNetworks) {
     Write-Host "Wrote $articleName to $htmlPath"
   }
 
-  $companyArticles = Get-CachedHuduCompanyArticles -CompanyId $network.company_id -Cache $ArticlesByCompanyId
+  $companyArticles = @(Get-CachedHuduCompanyArticles -CompanyId $network.company_id -Cache $ArticlesByCompanyId)
   $article = Find-HuduNetworkMapArticle `
     -Network $network `
     -ArticleName $articleName `
@@ -1987,18 +2046,26 @@ foreach ($network in $allNetworks) {
     Content   = $html
     CompanyId = $network.company_id
   }
+  $savedArticle = $null
   try {
     if ($article) {
       $articleRequest["id"] = $article.id
       $updatedArticle = Set-HuduArticle @articleRequest
+      $savedArticle = Get-HuduArticleCore $updatedArticle
+      if (-not $savedArticle) { $savedArticle = $article }
       Update-CachedHuduCompanyArticle -CompanyId $network.company_id -Cache $ArticlesByCompanyId -Article $updatedArticle
     } else {
       $newArticle = New-HuduArticle @articleRequest
+      $savedArticle = Get-HuduArticleCore $newArticle
       Update-CachedHuduCompanyArticle -CompanyId $network.company_id -Cache $ArticlesByCompanyId -Article $newArticle
     }
   } catch {
     Write-Error "$(if ($article) {"Error Updating Article $($article.id) $_"} else {"Error creating article $articleName $_"})"
   }
+  if ($savedArticle) {
+    Add-HuduNetworkMapArticleRelation -Network $network -Article $savedArticle
+  }
+
 }
 $HuduAPIKey = $null
 

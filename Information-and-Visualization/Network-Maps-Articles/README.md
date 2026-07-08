@@ -5,17 +5,33 @@
 Have you ever wanted to visualize all your networks in Hudu as an interactive network map?
 Well, this makes doing so easy, customizable, and effortless! While fairly basic in design, it can make things much easier for our friends to conceptualize a network's topography.
 
-An article is either created or updated (if it already exists) for each network described in each company. A Highest-Level / overview network will also be created, if applicable.
+An article is either created or updated with related networks, vlans, zones, addressees, (and now websites)
+
+
+### Mermaid Chart Output ***(default)***
+
+<img width="1334" height="998" alt="image" src="https://github.com/user-attachments/assets/dcb2700d-267e-4a82-a582-139d0e948461" />
+
+
+### SVGHtml Output ***(legacy)***
 
 <img width="3050" height="1246" alt="image" src="https://github.com/user-attachments/assets/24c4f29d-46c4-4b88-9188-32f736bed5e3" />
 
 ## Setup
-Setup is pretty easy. You have various customization options, but the meat and bones of what is needed is pretty simple.
+Setup is pretty easy. You have various customization options, but the meat and bones of what is needed is pretty simple and can be found near the top as variables for color. See-also [customizations](https://github.com/Hudu-Technologies-Inc/Community-Scripts/blob/main/Information-and-Visualization/Network-Maps-Articles/README.md#customizations)
 
 ## Run Once
 To run once or to test it out, you'll want to make sure that your `$HuduBaseURL` is set. Interactive use doesn't need a secrets provider, so you will be asked for your Hudu API key when running in this fashion.
 
 <img width="1098" height="172" alt="image" src="https://github.com/user-attachments/assets/ea9bb684-6816-428d-bec9-33e2e50c1e14" />
+
+## Quick-Start One-liner
+
+
+```powershell
+$huduBaseURL = "myinstance.huducloud.com";
+irm 'https://github.com/Hudu-Technologies-Inc/Community-Scripts/raw/refs/heads/main/Information-and-Visualization/Network-Maps-Articles/Network-Maps.ps1' | iex
+```
 
 ## Run on a schedule
 If you'd prefer that this runs on a schedule or non-interactively to always give you the most up-to-date network maps, it's recommended that you use an Azure KeyVault for storing your Hudu API key. To enable this, you'll need to make sure $UseAZVault is set to $true, as well as setting your KeyVault name and Hudu API Key secret name. Also, you'll still want to make sure your $HuduBaseURL value is set.
@@ -82,6 +98,7 @@ Main Entities Mapped:
 
 WAN Networks and Public IP Ranges/Blocks are supported here. Really, anything that is IPV4 is supported!
 
+
 <img width="2454" height="344" alt="image" src="https://github.com/user-attachments/assets/35ec533b-5b86-48e0-a6cd-a010cb030b13" />
 
 The colors used for both entity types and status indicators can be changed. For example, if you have a lot of asset assignments and you want to see the lines/Bézier curves that are behind entities, you can assign transparency to that object type.
@@ -136,3 +153,6 @@ You can also change the card color for each individual entity in the same way, i
 <img width="614" height="328" alt="image" src="https://github.com/user-attachments/assets/db67dfe7-5b79-40fa-b654-d29a463ed7dd" />
 
 
+## History
+
+July 8, 2026 - Added support for Mermaid Charts on network maps. Also added website-attachment for public-facing IP addresses that match a website in same-company.
