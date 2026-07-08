@@ -9,7 +9,7 @@ An article is either created or updated with related networks, vlans, zones, add
 
 ```powershell
 $huduBaseURL = "myinstance.huducloud.com";
-irm 'https://raw.githubusercontent.com/Hudu-Technologies-Inc/Community-Scripts/refs/heads/main/Information-And-Visualization/Relation-Charts/Relation-Charts.ps1' | iex
+irm 'https://github.com/Hudu-Technologies-Inc/Community-Scripts/raw/refs/heads/main/Information-and-Visualization/Network-Maps-Articles/Network-Maps.ps1' | iex
 ```
 
 
@@ -34,10 +34,6 @@ To run once or to test it out, you'll want to make sure that your `$HuduBaseURL`
 
 ## Quick-Start One-liner
 
-```powershell
-$huduBaseURL = "myinstance.huducloud.com";
-irm 'https://raw.githubusercontent.com/Hudu-Technologies-Inc/Community-Scripts/refs/heads/main/Information-And-Visualization/Netowrk-Maps-Articles/Network-Maps.ps1' | iex
-```
 
 
 ## Run on a schedule
