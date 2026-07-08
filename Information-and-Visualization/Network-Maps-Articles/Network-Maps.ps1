@@ -772,6 +772,46 @@ function Update-CachedHuduCompanyArticle {
   $Cache[$key] = @($existing + $core)
 }
 
+function Add-HuduNetworkMapArticleRelation {
+  param(
+    [Parameter(Mandatory)]$Network,
+    [Parameter(Mandatory)]$Article
+  )
+
+  if (-not (Get-Command -Name New-HuduRelation -ErrorAction SilentlyContinue)) {
+    return
+  }
+
+  $coreArticle = Get-HuduArticleCore $Article
+  if ($null -eq $coreArticle -or $null -eq $coreArticle.id -or $null -eq $Network.id) {
+    Write-Warning "Could not create network map relation because the network id or article id was unavailable."
+    return
+  }
+
+  $setHapiErrorsDirectory = Get-Command -Name Set-HapiErrorsDirectory -ErrorAction SilentlyContinue
+  try {
+    if ($setHapiErrorsDirectory) {
+      Set-HapiErrorsDirectory -skipRetry $true | Out-Null
+    }
+
+    New-HuduRelation `
+      -FromableType "Network" `
+      -FromableID ([int]$Network.id) `
+      -ToableType "Article" `
+      -ToableID ([int]$coreArticle.id) `
+      -ErrorAction Stop | Out-Null
+  } catch {
+    $message = "$($_.Exception.Message)"
+    if ($message -notmatch '(?i)(already|duplicate|exists|taken)') {
+      Write-Warning "Could not create relation from Network $($Network.id) to Article $($coreArticle.id): $message"
+    }
+  } finally {
+    if ($setHapiErrorsDirectory) {
+      Set-HapiErrorsDirectory -skipRetry $false | Out-Null
+    }
+  }
+}
+
 function Find-HuduNetworkMapArticle {
   param(
     [Parameter(Mandatory)]$Network,
@@ -2006,23 +2046,25 @@ foreach ($network in $allNetworks) {
     Content   = $html
     CompanyId = $network.company_id
   }
+  $savedArticle = $null
   try {
     if ($article) {
       $articleRequest["id"] = $article.id
       $updatedArticle = Set-HuduArticle @articleRequest
+      $savedArticle = Get-HuduArticleCore $updatedArticle
+      if (-not $savedArticle) { $savedArticle = $article }
       Update-CachedHuduCompanyArticle -CompanyId $network.company_id -Cache $ArticlesByCompanyId -Article $updatedArticle
     } else {
       $newArticle = New-HuduArticle @articleRequest
+      $savedArticle = Get-HuduArticleCore $newArticle
       Update-CachedHuduCompanyArticle -CompanyId $network.company_id -Cache $ArticlesByCompanyId -Article $newArticle
     }
   } catch {
     Write-Error "$(if ($article) {"Error Updating Article $($article.id) $_"} else {"Error creating article $articleName $_"})"
   }
-  try{if (get-command -name "Set-HapiErrorsDirectory" -and $null -ne $network.id -and $null -ne $articleRequest.id) {
-    Set-HapiErrorsDirectory -skipRetry $true | out-null
-    new-hudurelation -toable_type "Article" -toable_id $articleRequest.id -fromable_type "Network" -fromable_id $network.id | out-null
-    Set-HapiErrorsDirectory -skipRetry $false | out-null
-  }} catch {}
+  if ($savedArticle) {
+    Add-HuduNetworkMapArticleRelation -Network $network -Article $savedArticle
+  }
 
 }
 $HuduAPIKey = $null
