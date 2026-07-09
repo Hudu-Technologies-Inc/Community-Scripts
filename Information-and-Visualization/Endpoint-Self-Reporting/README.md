@@ -17,24 +17,24 @@ It matches assets by both `Company ID` and Serial Number, as not to overlap. It 
 
 ## Quick-Start One-liners
 
-Open a new pwsh7 session on your windows device and perform one of the following:
+Open a new pwsh7 session on your windows device and perform one of the following (changning 'mycompany' to your company's name):
 
 ### the Ninja-Oneliner [Ninja-Style]
 
 ```powershell
-irm 'https://raw.githubusercontent.com/Hudu-Technologies-Inc/Community-Scripts/refs/heads/main/Information-and-Visualization/Endpoint-Self-Reporting/Self-Report-Device.ps1' | iex
+$CompanyName='mycompany'; irm 'https://raw.githubusercontent.com/Hudu-Technologies-Inc/Community-Scripts/refs/heads/main/Information-and-Visualization/Endpoint-Self-Reporting/Self-Report-Device.ps1' | iex
 ```
 
 ### Clone+Start [Samurai-Style] (requires git scm installed)
 
 ```powershell
-git clone https://github.com/Hudu-Technologies-Inc/Community-Scripts; cd .\Community-Scripts\Information-and-Visualization\Endpoint-Self-Reporting; . .\Self-Report-Device.ps1;
+$CompanyName='mycompany'; git clone https://github.com/Hudu-Technologies-Inc/Community-Scripts; cd .\Community-Scripts\Information-and-Visualization\Endpoint-Self-Reporting; . .\Self-Report-Device.ps1;
 ```
 
 ### Download-Extract-Run [Ashigaru-Warrior-Style]
 
 ```powershell
-Invoke-WebRequest https://codeload.github.com/Hudu-Technologies-Inc/Community-Scripts/zip/refs/heads/main -OutFile Community-Scripts.zip; Expand-Archive -Path .\Community-Scripts.zip; cd .\Community-Scripts\Community-Scripts-main\Information-and-Visualization\Endpoint-Self-Reporting; . .\Self-Report-Device.ps1;
+$CompanyName='mycompany'; Invoke-WebRequest https://codeload.github.com/Hudu-Technologies-Inc/Community-Scripts/zip/refs/heads/main -OutFile Community-Scripts.zip; Expand-Archive -Path .\Community-Scripts.zip; cd .\Community-Scripts\Community-Scripts-main\Information-and-Visualization\Endpoint-Self-Reporting; . .\Self-Report-Device.ps1;
 ```
 
 
