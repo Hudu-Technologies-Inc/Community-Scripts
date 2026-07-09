@@ -498,7 +498,7 @@ function Set-DropDownsToListSelect {
 
 
 # begin
-Get-PSVersionCompatible; Get-HuduModule; Set-HuduInstance; Get-HuduVersionCompatible;
+Get-PSVersionCompatible; Get-HuduModule; Set-HuduInstance -HuduBaseURL $huduBaseURL -HuduAPIKey $HuduAPIKey; Get-HuduVersionCompatible;
 
 
 $layoutsToProcess = @()
