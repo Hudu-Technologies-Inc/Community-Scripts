@@ -682,7 +682,7 @@ function Get-CompanyRelationGraph {
         [bool]$OnlyIncludeExternalRelationsWhenSparse = $true,
         [int]$ExternalRelationThreshold = 25,
         [int]$MaxExternalRelations = 150,
-        [int]$MaxRelationMapNodes = 250,
+        [int]$MaxRelationMapNodes = 350,
         [bool]$EmbedAssetPasswordsInAssetNodes = $true,
         [bool]$HideEmbeddedAssetPasswordRelationNodes = $true
     )
