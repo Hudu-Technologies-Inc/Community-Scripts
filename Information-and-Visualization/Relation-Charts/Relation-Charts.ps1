@@ -11,6 +11,8 @@
 [string]$Direction = 'LR' # 'TB', 'TD', 'BT', 'RL', 'LR'
 [int]$EdgeStrokeWidth = 3
 [int]$ExternalRelationThreshold = 25
+[int]$MaxExternalRelations = 150
+[int]$MaxRelationMapNodes = 250
 [int]$LargeMapSectionThreshold = 40
 [int]$MinConnectedSectionSize = 5
 [bool]$OptimizeLayoutOrdering = $true
@@ -678,6 +680,8 @@ function Get-CompanyRelationGraph {
         [switch]$IncludeGlobalKb,
         [bool]$OnlyIncludeExternalRelationsWhenSparse = $true,
         [int]$ExternalRelationThreshold = 25,
+        [int]$MaxExternalRelations = 150,
+        [int]$MaxRelationMapNodes = 250,
         [bool]$EmbedAssetPasswordsInAssetNodes = $true,
         [bool]$HideEmbeddedAssetPasswordRelationNodes = $true
     )
@@ -834,9 +838,55 @@ function Get-CompanyRelationGraph {
         Write-Host "Skipping $($externalRelations.Count) external relation(s) for $($Company.name) because $($scopedRelations.Count) scoped relations meets/exceeds threshold $ExternalRelationThreshold." -ForegroundColor DarkYellow
     }
 
+    $externalRelationsSkippedByThreshold = if ($includeExternalRelations) { 0 } else { $externalRelations.Count }
+    $externalRelationsSkippedByLimit = 0
+    $includedExternalRelations = [System.Collections.Generic.List[object]]::new()
+
+    if ($includeExternalRelations) {
+        $projectedNodeKeys = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+        foreach ($relation in $scopedRelations) {
+            $null = $projectedNodeKeys.Add((Get-ObjectKey -Type $relation.fromable_type -Id $relation.fromable_id))
+            $null = $projectedNodeKeys.Add((Get-ObjectKey -Type $relation.toable_type -Id $relation.toable_id))
+        }
+
+        foreach ($relation in @($externalRelations | Sort-Object id)) {
+            if ($MaxExternalRelations -gt 0 -and $includedExternalRelations.Count -ge $MaxExternalRelations) {
+                $externalRelationsSkippedByLimit++
+                continue
+            }
+
+            $endpointKeys = @(
+                Get-ObjectKey -Type $relation.fromable_type -Id $relation.fromable_id
+                Get-ObjectKey -Type $relation.toable_type -Id $relation.toable_id
+            )
+
+            $newNodeCount = 0
+            foreach ($endpointKey in $endpointKeys) {
+                if (-not $projectedNodeKeys.Contains($endpointKey)) { $newNodeCount++ }
+            }
+
+            if ($MaxRelationMapNodes -gt 0 -and ($projectedNodeKeys.Count + $newNodeCount) -gt $MaxRelationMapNodes) {
+                $externalRelationsSkippedByLimit++
+                continue
+            }
+
+            $includedExternalRelations.Add($relation)
+            foreach ($endpointKey in $endpointKeys) {
+                $null = $projectedNodeKeys.Add($endpointKey)
+            }
+        }
+
+        if ($externalRelationsSkippedByLimit -gt 0) {
+            $limitReasons = [System.Collections.Generic.List[string]]::new()
+            if ($MaxExternalRelations -gt 0) { $limitReasons.Add("$MaxExternalRelations external relation(s)") }
+            if ($MaxRelationMapNodes -gt 0) { $limitReasons.Add("$MaxRelationMapNodes total node(s)") }
+            Write-Host "Skipping $externalRelationsSkippedByLimit external relation(s) for $($Company.name) to keep the map under $($limitReasons -join ' and ')." -ForegroundColor DarkYellow
+        }
+    }
+
     $graphRelations = @(
         $scopedRelations
-        if ($includeExternalRelations) { $externalRelations }
+        $includedExternalRelations
     )
 
     $nodes = @{}
@@ -873,8 +923,10 @@ function Get-CompanyRelationGraph {
         Relations = $graphRelations
         Nodes     = @($nodes.Values)
         ScopedRelationCount   = $scopedRelations.Count
-        ExternalRelationCount = if ($includeExternalRelations) { $externalRelations.Count } else { 0 }
-        ExternalRelationsSkipped = if ($includeExternalRelations) { 0 } else { $externalRelations.Count }
+        ExternalRelationCount = $includedExternalRelations.Count
+        ExternalRelationsSkipped = $externalRelationsSkippedByThreshold + $externalRelationsSkippedByLimit
+        ExternalRelationsSkippedByThreshold = $externalRelationsSkippedByThreshold
+        ExternalRelationsSkippedByLimit = $externalRelationsSkippedByLimit
         OutOfScopeRelationsSkipped = $outOfScopeRelationsSkipped
     }
 }
@@ -1216,17 +1268,31 @@ function New-MermaidRelationMap {
         $lines.Add("    linkStyle default stroke-width:${EdgeStrokeWidth}px;")
     }
 
-    $lines.Add("    classDef scoped fill:$InCompanyNodeColor,stroke:#3478bd,color:#102235")
-    $lines.Add("    classDef external fill:$OutsideCompanyNodeColor,stroke:#d97706,color:#3b2200")
-    $lines.Add("    classDef global fill:#eef8ed,stroke:#39833b,color:#0f2f12")
+    $lines.Add("    classDef scopeScoped fill:$InCompanyNodeColor,stroke:#3478bd,color:#102235;")
+    $lines.Add("    classDef scopeExternal fill:$OutsideCompanyNodeColor,stroke:#d97706,color:#3b2200;")
+    $lines.Add("    classDef scopeGlobal fill:#eef8ed,stroke:#39833b,color:#0f2f12;")
 
+    $nodeIdsByClass = @{
+        scopeScoped = [System.Collections.Generic.List[string]]::new()
+        scopeExternal = [System.Collections.Generic.List[string]]::new()
+        scopeGlobal = [System.Collections.Generic.List[string]]::new()
+    }
     foreach ($node in $Graph.Nodes) {
         $className = switch ($node.Scope) {
-            'External' { 'external' }
-            'Global' { 'global' }
-            default { 'scoped' }
+            'External' { 'scopeExternal' }
+            'Global' { 'scopeGlobal' }
+            default { 'scopeScoped' }
         }
-        $lines.Add("    class $($node.MermaidId) $className")
+        $nodeIdsByClass[$className].Add($node.MermaidId)
+    }
+
+    foreach ($className in @('scopeScoped', 'scopeExternal', 'scopeGlobal')) {
+        $nodeIds = @($nodeIdsByClass[$className] | Sort-Object)
+        for ($i = 0; $i -lt $nodeIds.Count; $i += 50) {
+            $endIndex = [Math]::Min($i + 49, $nodeIds.Count - 1)
+            $chunk = @($nodeIds[$i..$endIndex])
+            $lines.Add("    class $($chunk -join ',') $className;")
+        }
     }
 
     foreach ($node in @($Graph.Nodes | Sort-Object MermaidId)) {
@@ -1256,8 +1322,10 @@ function New-RelationMapArticleHtml {
     $summaryParts.Add("Generated $generated.")
     $summaryParts.Add("Shows $nodeCount related object node$(if ($nodeCount -eq 1) { '' } else { 's' }) and $relationCount relation record$(if ($relationCount -eq 1) { '' } else { 's' }) touching this company's scoped objects.")
 
-    if ((Get-HuduPropertyValue -Object $Graph -Name 'ExternalRelationsSkipped' -DefaultValue 0) -gt 0) {
+    if ((Get-HuduPropertyValue -Object $Graph -Name 'ExternalRelationsSkippedByThreshold' -DefaultValue 0) -gt 0) {
         $summaryParts.Add("External related nodes were skipped because this company already has $($Graph.ScopedRelationCount) in-company relation records.")
+    } elseif ((Get-HuduPropertyValue -Object $Graph -Name 'ExternalRelationsSkippedByLimit' -DefaultValue 0) -gt 0) {
+        $summaryParts.Add("Skipped $($Graph.ExternalRelationsSkippedByLimit) external relation record$(if ($Graph.ExternalRelationsSkippedByLimit -eq 1) { '' } else { 's' }) to keep this large map renderable.")
     } elseif ((Get-HuduPropertyValue -Object $Graph -Name 'ExternalRelationCount' -DefaultValue 0) -gt 0) {
         $summaryParts.Add("Includes $($Graph.ExternalRelationCount) external relation record$(if ($Graph.ExternalRelationCount -eq 1) { '' } else { 's' }).")
     }
@@ -1403,6 +1471,8 @@ $results = foreach ($company in $selectedCompanies) {
         -IncludeGlobalKb:$IncludeGlobalArticles `
         -OnlyIncludeExternalRelationsWhenSparse $OnlyIncludeExternalRelationsWhenSparse `
         -ExternalRelationThreshold $ExternalRelationThreshold `
+        -MaxExternalRelations $MaxExternalRelations `
+        -MaxRelationMapNodes $MaxRelationMapNodes `
         -EmbedAssetPasswordsInAssetNodes $EmbedAssetPasswordsInAssetNodes `
         -HideEmbeddedAssetPasswordRelationNodes $HideEmbeddedAssetPasswordRelationNodes
 
