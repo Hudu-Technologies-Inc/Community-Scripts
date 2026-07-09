@@ -53,9 +53,24 @@ These colors can be changed by assigning hexadecimal color values to the color-r
 
 You can clone this repository, download the zip for this repository and launch this script, or here is a handy ninja-oneliner to try it out!
 
+Open a new pwsh7 session on your windows device and perform one of the following:
+
+### the Ninja-Oneliner [Ninja-Style]
+
 ```powershell
-$huduBaseURL = "myinstance.huducloud.com";
 irm 'https://raw.githubusercontent.com/Hudu-Technologies-Inc/Community-Scripts/refs/heads/main/Information-and-Visualization/Relation-Charts/Relation-Charts.ps1' | iex
+```
+
+### Clone+Start [Samurai-Style] (requires git scm installed)
+
+```powershell
+git clone https://github.com/Hudu-Technologies-Inc/Community-Scripts; cd .\Community-Scripts\Information-and-Visualization\Relation-Charts; . .\Relation-Charts.ps1;
+```
+
+### Download-Extract-Run [Ashigaru-Warrior-Style]
+
+```powershell
+Invoke-WebRequest https://codeload.github.com/Hudu-Technologies-Inc/Community-Scripts/zip/refs/heads/main -OutFile Community-Scripts.zip; Expand-Archive -Path .\Community-Scripts.zip; cd .\Community-Scripts\Community-Scripts-main\Information-and-Visualization\Relation-Charts; . .\Relation-Charts.ps1;
 ```
 
 ## How nodes are grouped
