@@ -63,6 +63,8 @@ The Mermaid renderer reuses the same palette settings where Mermaid supports the
 - `$ColorByType` sets each entity node's fill color.
 - `$ColorByStatus` sets a thicker node border for entities with a known status.
 - `$CurvyEdges` controls Mermaid's line curve style.
+- `$MaxMermaidNodes` caps Mermaid output size. Network, VLAN, zone, and asset backbone nodes are kept; address and website nodes are skipped after the cap. Defaults to `250`, and `0` disables the cap.
+- `$MaxAddressesPerNetwork` still caps how many IP address records are considered per network before the total Mermaid node cap is applied.
 
 Because Hudu renders Mermaid natively, this mode cannot reproduce the full custom SVG card layout or embedded SVG icons, but the generated article includes a compact legend/header so the diagrams are closer in polish to the original SVG/HTML output.
 
