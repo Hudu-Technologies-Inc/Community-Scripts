@@ -56,6 +56,29 @@ Tracking health information of your Hudu instance can be helpful for even those 
     - Notes that MIME-type indicates document/file format for embedded content
 
 
+## Quick-Start Oneliners
+
+Open a new pwsh7 session on your windows device and perform one of the following:
+
+### the Ninja-Oneliner [Ninja-Style]
+
+```powershell
+irm 'https://raw.githubusercontent.com/Hudu-Technologies-Inc/Community-Scripts/refs/heads/main/Administration/Storage-Usage-and-Basic-Health-Info/Storage-And-Health.ps1' | iex
+```
+
+### Clone+Start [Samurai-Style] (requires git scm installed)
+
+```powershell
+git clone https://github.com/Hudu-Technologies-Inc/Community-Scripts; cd .\Community-Scripts\Administration\Storage-Usage-and-Basic-Health-Info; . .\Storage-And-Health.ps1;
+```
+
+### Download-Extract-Run [Ashigaru-Warrior-Style]
+
+```powershell
+Invoke-WebRequest https://codeload.github.com/Hudu-Technologies-Inc/Community-Scripts/zip/refs/heads/main -OutFile Community-Scripts.zip; Expand-Archive -Path .\Community-Scripts.zip; cd .\Community-Scripts\Community-Scripts-main\Administration\Storage-Usage-and-Basic-Health-Info; . .\Storage-And-Health.ps1;
+```
+
+
 ## Setting Up
 
 Setting Up is easy, All you need to do is:
