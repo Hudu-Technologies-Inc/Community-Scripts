@@ -29,10 +29,24 @@ To run once or to test it out, you'll want to make sure that your `$HuduBaseURL`
 
 ## Quick-Start One-liner
 
+Open a new pwsh7 session on your windows device and perform one of the following:
+
+### the Ninja-Oneliner [Ninja-Style]
 
 ```powershell
-$huduBaseURL = "myinstance.huducloud.com";
-irm 'https://github.com/Hudu-Technologies-Inc/Community-Scripts/raw/refs/heads/main/Information-and-Visualization/Network-Maps-Articles/Network-Maps.ps1' | iex
+irm 'https://raw.githubusercontent.com/Hudu-Technologies-Inc/Community-Scripts/refs/heads/main/Information-and-Visualization/Network-Maps-Articles/Network-Maps.ps1' | iex
+```
+
+### Clone+Start [Samurai-Style] (requires git scm installed)
+
+```powershell
+git clone https://github.com/Hudu-Technologies-Inc/Community-Scripts; cd .\Community-Scripts\Information-and-Visualization\Network-Maps-Articles; . .\Network-Maps.ps1;
+```
+
+### Download-Extract-Run [Ashigaru-Warrior-Style]
+
+```powershell
+Invoke-WebRequest https://codeload.github.com/Hudu-Technologies-Inc/Community-Scripts/zip/refs/heads/main -OutFile Community-Scripts.zip; Expand-Archive -Path .\Community-Scripts.zip; cd .\Community-Scripts\Community-Scripts-main\Information-and-Visualization\Network-Maps-Articles; . .\Network-Maps.ps1;
 ```
 
 ## Run on a schedule
