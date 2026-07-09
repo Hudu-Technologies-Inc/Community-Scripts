@@ -8,6 +8,28 @@ There are *several angles to consider* - user permissions, group permissions, pu
 
 If you are a ***'Totally Tabular'*** kind of user, this is just the tool for you- the results export to a few handy csv's for any drilldown or analysis needed (no actual passwords included in these tables).
 
+## Quick-Start Oneliners
+
+Open a new pwsh7 session on your windows device and perform one of the following:
+
+### the Ninja-Oneliner [Ninja-Style]
+
+```powershell
+irm 'https://raw.githubusercontent.com/Hudu-Technologies-Inc/Community-Scripts/refs/heads/main/Administration/RBAC-and-Access-Info/Audit-Hudu.ps1' | iex
+```
+
+### Clone+Start [Samurai-Style] (requires git scm installed)
+
+```powershell
+git clone https://github.com/Hudu-Technologies-Inc/Community-Scripts; cd .\Community-Scripts\Administration\RBAC-and-Access-Info; . .\Audit-Hudu.ps1;
+```
+
+### Download-Extract-Run [Ashigaru-Warrior-Style]
+
+```powershell
+Invoke-WebRequest https://codeload.github.com/Hudu-Technologies-Inc/Community-Scripts/zip/refs/heads/main -OutFile Community-Scripts.zip; Expand-Archive -Path .\Community-Scripts.zip; cd .\Community-Scripts\Community-Scripts-main\Administration\RBAC-and-Access-Info; . .\Audit-Hudu.ps1;
+```
+
 ## RBAC Passwords / Folders Section
 
 tables included:

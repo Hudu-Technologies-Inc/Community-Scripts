@@ -362,6 +362,7 @@ function Get-PSVersionCompatible {
 }
 
 function Set-HuduInstance {
+    param ($HuduBaseUrl, $HuduAPIKey)
     $HuduBaseURL = $HuduBaseURL ?? 
         $((Read-Host -Prompt 'Set the base domain of your Hudu instance (e.g https://myinstance.huducloud.com)') -replace '[\\/]+$', '') -replace '^(?!https://)', 'https://'
     $HuduAPIKey = $HuduAPIKey ?? "$(read-host "Please Enter Hudu API Key")"
@@ -375,8 +376,10 @@ function Set-HuduInstance {
     New-HuduBaseURL $HuduBaseURL
 }
 
-
-Get-PSVersionCompatible; Get-HuduModule; Set-HuduInstance; Get-HuduVersionCompatible;
+$huduBaseurl = $huduBaseurl ?? $(read-host "Enter Hudu Base URL (e.g. https://myinstance.huducloud.com)")
+$huduAPIkey = $huduAPIkey ?? $(read-host "Enter Hudu API Key")
+clear-host
+Get-PSVersionCompatible; Get-HuduModule; Set-HuduInstance -HuduBaseUrl $HuduBaseURL -HuduAPIKey $huduAPIkey; Get-HuduVersionCompatible;
 
 $allLayouts = Get-HuduAssetLayouts
 $allLayouts = $allLayouts | where-object { ($_.asset_layout ?? $_).fields | where-object { $_.field_type -ieq "Text" } | select-object -first 1 }
