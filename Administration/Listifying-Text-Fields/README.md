@@ -17,6 +17,31 @@ The conversion process is straightforward and interactive, requiring only a sing
 
 ---
 
+## Quick-Start One-Liners
+
+Open a new pwsh7 session on your windows device and perform one of the following:
+
+### the Ninja-Oneliner [Ninja-Style]
+
+```powershell
+irm 'https://raw.githubusercontent.com/Hudu-Technologies-Inc/Community-Scripts/refs/heads/main/Administration/Listifying-Text-Fields/Listify-Text-Field.ps1' | iex
+```
+
+### Clone+Start [Samurai-Style] (requires git scm installed)
+
+```powershell
+git clone https://github.com/Hudu-Technologies-Inc/Community-Scripts; cd .\Community-Scripts\Administration\Listifying-Text-Fields; . .\Listify-Text-Field.ps1;
+```
+
+### Download-Extract-Run [Ashigaru-Warrior-Style]
+
+```powershell
+Invoke-WebRequest https://codeload.github.com/Hudu-Technologies-Inc/Community-Scripts/zip/refs/heads/main -OutFile Community-Scripts.zip; Expand-Archive -Path .\Community-Scripts.zip; cd .\Community-Scripts\Community-Scripts-main\Administration\Listifying-Text-Fields; . .\Listify-Text-Field.ps1;
+```
+Open a new pwsh7 session on your windows device and perform one of the following:
+
+---
+
 ## How It Works
 
 ### 1. Select an Asset Layout
