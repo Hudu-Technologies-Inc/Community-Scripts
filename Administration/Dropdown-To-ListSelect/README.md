@@ -8,7 +8,21 @@ If you have some pesky *"legacy"* dropdown fields in your layouts, this will hel
 
 # NOTE, IF YOU ARE SELF-HOSTED IT IS RECCOMENDED THAT YOU RUN THE RAKE MIGRATION FOR THIS
 
+to do so, drop into interactive shell or execute these terminal commands inside your app container.
+
+```sh
+rake convert_dropdowns:to_lists DRY_RUN=true
+```
+
+and after that looks good you can do it without dry-run
+
+```sh
+rake convert_dropdowns:list_dropdowns
+```
+
 ## Quick-start oneliners
+
+To easily begin, Open a new pwsh7 session on your windows device and perform one of the following:
 
 the Ninja-Oneliner [Ninja-Style]
 
