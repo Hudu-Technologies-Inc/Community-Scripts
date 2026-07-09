@@ -6,6 +6,28 @@
 
 If you have some pesky *"legacy"* dropdown fields in your layouts, this will help you switch them over to newer ***ListSelect*** fields in no time.
 
+# NOTE, IF YOU ARE SELF-HOSTED IT IS RECCOMENDED THAT YOU RUN THE RAKE MIGRATION FOR THIS
+
+## Quick-start oneliners
+
+the Ninja-Oneliner [Ninja-Style]
+
+```powershell
+irm 'https://raw.githubusercontent.com/Hudu-Technologies-Inc/Community-Scripts/refs/heads/main/Administration/Dropdown-To-ListSelect/DropDownToListSelect.ps1' | iex
+```
+
+Clone+Start [Samurai-Style] (requires git scm installed)
+
+```powershell
+git clone https://github.com/Hudu-Technologies-Inc/Community-Scripts; cd .\Community-Scripts\Administration\Dropdown-To-ListSelect; . .\DropDownToListSelect.ps1;
+```
+
+Download-Extract-Run [Ashigaru-Warrior-Style]
+
+```powershell
+Invoke-WebRequest https://codeload.github.com/Hudu-Technologies-Inc/Community-Scripts/zip/refs/heads/main -OutFile Community-Scripts.zip; Expand-Archive -Path .\Community-Scripts.zip; cd .\Community-Scripts\Community-Scripts-main\Administration\Dropdown-To-ListSelect; . .\DropDownToListSelect.ps1;
+```
+
 Selecting your best course of action will vary, depending on where your instance is hosted. Self-Hosters are reccomended to use this guide, since they have direct access to rails console.
 
 ## Step 1: Make sure you have a backup
