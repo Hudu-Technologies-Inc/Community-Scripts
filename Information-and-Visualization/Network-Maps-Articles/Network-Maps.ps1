@@ -42,6 +42,7 @@ $ShowDetails = $true # Add additional relationships and entity details during pa
 $NetworkMapOutputFormat = "Mermaid" # Mermaid uses Hudu's native diagram renderer. SvgHtml keeps the original generated SVG/HTML output.
 
 $MaxAddressesPerNetwork = 200
+$MaxMermaidNodes = 250 # Maximum Mermaid nodes per generated article. Backbone nodes are kept; addresses/websites are skipped after this.
 
 $CurvyEdges = $true # Use Bézier curves or straight lines when drawing relationship lines
 
@@ -1315,6 +1316,16 @@ function New-MermaidNodeId {
   return $safe
 }
 
+function New-MermaidClassName {
+  param(
+    [Parameter(Mandatory)][string]$Prefix,
+    [AllowNull()][string]$Value
+  )
+  $safe = "$Prefix`_$Value" -replace '[^A-Za-z0-9_]', '_'
+  if ($safe -notmatch '^[A-Za-z_]') { $safe = "c_$safe" }
+  return $safe
+}
+
 function ConvertTo-MermaidLabelText {
   param([AllowNull()]$Text)
   if ($null -eq $Text) { return '' }
@@ -1343,6 +1354,7 @@ function New-NetworkMapMermaidArticle {
     [bool] $OpenLinksInNewWindow = $true,
     [bool] $ShowDetails = $true,
     [int] $MaxAddressesPerNetwork = 50,
+    [int] $MaxMermaidNodes = 250,
     [hashtable] $ColorByType = @{},
     [hashtable] $ColorByStatus = @{},
     [bool] $CurvyEdges = $true,
@@ -1427,6 +1439,9 @@ function New-NetworkMapMermaidArticle {
   $nodes = @{}
   $links = New-Object System.Collections.Generic.List[object]
   $assetNodeById = @{}
+  $renderStats = @{
+    SkippedMermaidNodes = 0
+  }
 
   function AddNode {
     param(
@@ -1434,24 +1449,50 @@ function New-NetworkMapMermaidArticle {
       [string]$Label,
       [string]$Type,
       [AllowNull()][string]$Url,
-      [hashtable]$Meta
+      [hashtable]$Meta,
+      [switch]$Optional
     )
+    if ($nodes.ContainsKey($Id)) { return $true }
+
+    if ($Optional.IsPresent -and $MaxMermaidNodes -gt 0 -and $nodes.Count -ge $MaxMermaidNodes) {
+      $renderStats.SkippedMermaidNodes++
+      return $false
+    }
+
+    $safeMeta = if ($Meta) { $Meta } else { @{} }
     if (-not $nodes.ContainsKey($Id)) {
       $nodes[$Id] = [pscustomobject]@{
         Id = $Id
         Label = $Label
         Type = $Type
         Url = $Url
-        Meta = $Meta
-        Status = $Meta.Status
+        Meta = $safeMeta
+        Status = $safeMeta.Status
       }
     }
+
+    return $true
   }
 
   function AddLink {
     param([string]$Source,[string]$Target,[string]$Label = $null)
-    if ($Source -and $Target) {
+    if ($Source -and $Target -and $nodes.ContainsKey($Source) -and $nodes.ContainsKey($Target)) {
       [void]$links.Add([pscustomobject]@{ Source = $Source; Target = $Target; Label = $Label })
+    }
+  }
+
+  function AddClassAssignment {
+    param(
+      [System.Text.StringBuilder]$Diagram,
+      [string[]]$Ids,
+      [string]$ClassName
+    )
+
+    $sortedIds = @($Ids | Where-Object { $_ } | Sort-Object)
+    for ($i = 0; $i -lt $sortedIds.Count; $i += 50) {
+      $endIndex = [Math]::Min($i + 49, $sortedIds.Count - 1)
+      $chunk = @($sortedIds[$i..$endIndex])
+      [void]$Diagram.AppendLine("  class $($chunk -join ',') $ClassName;")
     }
   }
 
@@ -1471,12 +1512,12 @@ function New-NetworkMapMermaidArticle {
     if ($ctx.NetworkMeta) {
       foreach ($k in $ctx.NetworkMeta.Keys) { $netMeta[$k] = $ctx.NetworkMeta[$k] }
     }
-    AddNode -Id $nid -Label $netName -Type 'Network' -Url $net.url -Meta $netMeta
+    $null = AddNode -Id $nid -Label $netName -Type 'Network' -Url $net.url -Meta $netMeta
 
     $vid = $null
     if ($vlan) {
       $vid = New-MermaidNodeId -Type 'VLAN' -Id $vlan.id
-      AddNode -Id $vid -Label ($vlan.name ?? "VLAN $($vlan.id)") -Type 'VLAN' -Url $vlan.url -Meta @{
+      $null = AddNode -Id $vid -Label ($vlan.name ?? "VLAN $($vlan.id)") -Type 'VLAN' -Url $vlan.url -Meta @{
         VLAN_ID = $vlan.vlan_id
         Description = $vlan.description
       }
@@ -1485,7 +1526,7 @@ function New-NetworkMapMermaidArticle {
 
     if ($zone) {
       $zid = New-MermaidNodeId -Type 'Zone' -Id $zone.id
-      AddNode -Id $zid -Label ($zone.name ?? "Zone $($zone.id)") -Type 'Zone' -Url $zone.url -Meta @{
+      $null = AddNode -Id $zid -Label ($zone.name ?? "Zone $($zone.id)") -Type 'Zone' -Url $zone.url -Meta @{
         VLAN_Range = $zone.vlan_id_ranges
         Description = $zone.description
       }
@@ -1504,7 +1545,7 @@ function New-NetworkMapMermaidArticle {
           $assetMeta[$k] = $ctx.AssetMetaById["$($asset.id)"][$k]
         }
       }
-      AddNode -Id $aid -Label ($asset.name ?? "Asset $($asset.id)") -Type 'Asset' -Url $asset.url -Meta $assetMeta
+      $null = AddNode -Id $aid -Label ($asset.name ?? "Asset $($asset.id)") -Type 'Asset' -Url $asset.url -Meta $assetMeta
       AddLink -Source $nid -Target $aid
       $assetNodeById["$($asset.id)"] = $aid
     }
@@ -1525,7 +1566,9 @@ function New-NetworkMapMermaidArticle {
         }
       }
 
-      AddNode -Id $ipid -Label ($ip.address ?? "Address $ipKey") -Type 'Address' -Url $ip.url -Meta $ipMeta
+      $addressAdded = AddNode -Id $ipid -Label ($ip.address ?? "Address $ipKey") -Type 'Address' -Url $ip.url -Meta $ipMeta -Optional
+      if (-not $addressAdded) { continue }
+
       $src = $nid
       if ($ip.asset_id -and $assetNodeById.ContainsKey("$($ip.asset_id)")) {
         $src = $assetNodeById["$($ip.asset_id)"]
@@ -1542,8 +1585,10 @@ function New-NetworkMapMermaidArticle {
             Status = $site.status
             Paused = $site.paused
           }
-          AddNode -Id $wid -Label ($site.name ?? "Website $($site.id)") -Type 'Website' -Url $match.Url -Meta $siteMeta
-          AddLink -Source $ipid -Target $wid
+          $websiteAdded = AddNode -Id $wid -Label ($site.name ?? "Website $($site.id)") -Type 'Website' -Url $match.Url -Meta $siteMeta -Optional
+          if ($websiteAdded) {
+            AddLink -Source $ipid -Target $wid
+          }
         }
       }
     }
@@ -1586,7 +1631,9 @@ function New-NetworkMapMermaidArticle {
     [void]$diagram.AppendLine("  $($link.Source) $edge $($link.Target)")
   }
 
+  $typeClassByType = @{}
   foreach ($type in @('Zone','VLAN','Network','Asset','Address','Website')) {
+    $typeClassByType[$type] = New-MermaidClassName -Prefix 'type' -Value $type
     $fill = if ($ColorByType -and $ColorByType.ContainsKey($type)) { $ColorByType[$type] } else {
       switch ($type) {
         'Zone'    { $ZoneColor }
@@ -1598,32 +1645,25 @@ function New-NetworkMapMermaidArticle {
       }
     }
     $fill = ConvertTo-MermaidCssColor $fill
-    [void]$diagram.AppendLine("  classDef $type fill:$fill,stroke:$mermaidEdge,stroke-width:1px,color:$mermaidText;")
+    $className = $typeClassByType[$type]
+    [void]$diagram.AppendLine("  classDef $className fill:$fill,stroke:$mermaidEdge,stroke-width:1px,color:$mermaidText;")
     $ids = @($nodes.Values | Where-Object { $_.Type -eq $type } | ForEach-Object { $_.Id })
     if ($ids.Count -gt 0) {
-      [void]$diagram.AppendLine("  class $($ids -join ',') $type;")
+      AddClassAssignment -Diagram $diagram -Ids $ids -ClassName $className
     }
   }
 
-  foreach ($node in $nodes.Values) {
-    $fill = if ($ColorByType -and $ColorByType.ContainsKey($node.Type)) { $ColorByType[$node.Type] } else {
-      switch ($node.Type) {
-        'Zone'    { $ZoneColor }
-        'VLAN'    { $VlanColor }
-        'Network' { $NetworkColor }
-        'Asset'   { $AssetColor }
-        'Address' { $AddressColor }
-        'Website' { $WebsiteColor }
-      }
-    }
-    $status = $node.Status
-    $stroke = if ($status -and $ColorByStatus -and $ColorByStatus.ContainsKey($status)) {
+  $statusValues = @($nodes.Values | Where-Object { $_.Status } | ForEach-Object { $_.Status } | Sort-Object -Unique)
+  foreach ($status in $statusValues) {
+    $statusClassName = New-MermaidClassName -Prefix 'status' -Value $status
+    $stroke = if ($ColorByStatus -and $ColorByStatus.ContainsKey($status)) {
       $ColorByStatus[$status]
     } else {
       $EdgeColor
     }
-    $strokeWidth = if ($status) { '4px' } else { '1px' }
-    [void]$diagram.AppendLine("  style $($node.Id) fill:$(ConvertTo-MermaidCssColor $fill),stroke:$(ConvertTo-MermaidCssColor $stroke),stroke-width:$strokeWidth,color:$mermaidText")
+    [void]$diagram.AppendLine("  classDef $statusClassName stroke:$(ConvertTo-MermaidCssColor $stroke),stroke-width:4px;")
+    $ids = @($nodes.Values | Where-Object { $_.Status -eq $status } | ForEach-Object { $_.Id })
+    AddClassAssignment -Diagram $diagram -Ids $ids -ClassName $statusClassName
   }
 
   $target = if ($OpenLinksInNewWindow) { '_blank' } else { '_self' }
@@ -1652,20 +1692,24 @@ function New-NetworkMapMermaidArticle {
     "<span style=`"display:inline-flex;align-items:center;gap:6px;margin:0 8px 8px 0;padding:5px 9px;border:1px solid $legendEdge;border-radius:7px;background:$legendBackground;color:$legendText;font-size:12px;`"><span style=`"width:11px;height:11px;border-radius:3px;background:$(ConvertTo-HtmlAttribute $fill);display:inline-block;`"></span>$type</span>"
   }
 
-  $statusValues = @($nodes.Values | Where-Object { $_.Status } | ForEach-Object { $_.Status } | Sort-Object -Unique)
   $statusLegendItems = foreach ($status in $statusValues) {
     $color = if ($ColorByStatus -and $ColorByStatus.ContainsKey($status)) { $ColorByStatus[$status] } else { $EdgeColor }
     "<span style=`"display:inline-flex;align-items:center;gap:6px;margin:0 8px 8px 0;padding:5px 9px;border:1px solid $legendEdge;border-radius:7px;background:$legendBackground;color:$legendText;font-size:12px;`"><span style=`"width:11px;height:11px;border-radius:999px;background:$(ConvertTo-HtmlAttribute $color);display:inline-block;`"></span>$(ConvertTo-HtmlText $status)</span>"
   }
 
   $counts = @($nodes.Values | Group-Object Type | Sort-Object Name | ForEach-Object { "$($_.Name): $($_.Count)" }) -join ' &middot; '
+  $limitSummary = if ($renderStats.SkippedMermaidNodes -gt 0) {
+    " &middot; Skipped $($renderStats.SkippedMermaidNodes) address/website node$(if ($renderStats.SkippedMermaidNodes -eq 1) { '' } else { 's' }) to keep Mermaid under $MaxMermaidNodes nodes"
+  } else {
+    ""
+  }
   $generated = Get-Date -Format 'yyyy-MM-dd HH:mm'
   $legend = @"
 <div style="border:1px solid $legendEdge;border-radius:8px;padding:12px 14px;margin:0 0 12px 0;background:$legendBackground;color:$legendText;font-family:Inter,Segoe UI,Arial,sans-serif;">
   <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap;">
     <div>
       <div style="font-size:18px;font-weight:700;line-height:1.2;">Network Map</div>
-      <div style="font-size:12px;opacity:.72;margin-top:4px;">$counts &middot; Generated $generated</div>
+      <div style="font-size:12px;opacity:.72;margin-top:4px;">$counts &middot; Generated $generated$limitSummary</div>
     </div>
     <div style="font-size:12px;opacity:.72;">Fill = entity type &middot; border = status</div>
   </div>
@@ -2004,6 +2048,7 @@ foreach ($network in $allNetworks) {
         -Contexts $ctxs `
         -ShowDetails:$ShowDetails `
         -MaxAddressesPerNetwork $MaxAddressesPerNetwork `
+        -MaxMermaidNodes $MaxMermaidNodes `
         -OpenLinksInNewWindow $OpenLinksInNewWindow `
         -ColorByType $ColorByType `
         -ColorByStatus $ColorByStatus `
