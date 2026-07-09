@@ -15,9 +15,9 @@ if ($true -eq $useAZVault){
     clear-host
 }
 
-$CompanyName            = "Company to Record Into"               # Company Name (exact) which this device should be attributed to
-$HowOftenDays           = 2                                      # how often or how far back to record data for (in days)
-$HuduAssetLayoutName    = "Monitored Workstation"                # name of asset layout to create/use
+$CompanyName            = $$CompanyName ?? "Company to Record Into"               # Company Name (exact) which this device should be attributed to
+$HowOftenDays           = $HowOftenDays ?? 2                                      # how often or how far back to record data for (in days)
+$HuduAssetLayoutName    = $HuduAssetLayoutName ?? "Monitored Workstation"                # name of asset layout to create/use
 $TableTheme = @{
     Font      = '13px/1.35 system-ui, Segoe UI, Arial'
     Border    = '#191d67ac'
