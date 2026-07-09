@@ -620,7 +620,7 @@ function Get-LocationLayout {
 }
 
 
-Get-PSVersionCompatible; Get-HuduModule; Set-HuduInstance; Get-HuduVersionCompatible;
+Get-PSVersionCompatible; Get-HuduModule; Set-HuduInstance -HuduBaseURL $huduBaseURL -HuduAPIKey $HuduAPIKey; Get-HuduVersionCompatible;
 
 $companyColors = @{}
 foreach ($c in $allCompanies){

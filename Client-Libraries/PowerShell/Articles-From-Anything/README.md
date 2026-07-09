@@ -36,6 +36,28 @@ you can add additional request headers as you'd like
 
 <img width="1860" height="1592" alt="image" src="https://github.com/user-attachments/assets/4d624422-a69a-4ede-aa41-9e4e92d937e4" />
 
+## Quick-Start Oneliners
+
+Open a new pwsh7 session on your windows device and perform one of the following:
+
+### the Ninja-Oneliner [Ninja-Style]
+
+```powershell
+irm 'https://raw.githubusercontent.com/Hudu-Technologies-Inc/Community-Scripts/refs/heads/main/Client-Libraries/PowerShell/Articles-From-Anything/articles-from-anything.ps1' | iex
+```
+
+### Clone+Start [Samurai-Style] (requires git scm installed)
+
+```powershell
+git clone https://github.com/Hudu-Technologies-Inc/Community-Scripts; cd .\Community-Scripts\Client-Libraries\PowerShell\Articles-From-Anything; . .\articles-from-anything.ps1;
+```
+
+### Download-Extract-Run [Ashigaru-Warrior-Style]
+
+```powershell
+Invoke-WebRequest https://codeload.github.com/Hudu-Technologies-Inc/Community-Scripts/zip/refs/heads/main -OutFile Community-Scripts.zip; Expand-Archive -Path .\Community-Scripts.zip; cd .\Community-Scripts\Community-Scripts-main\Client-Libraries\PowerShell\Articles-From-Anything; . .\articles-from-anything.ps1;
+```
+
 -Note: Articles and associated files are searched for by same-name, so articles will be updated if they already exist, existing photos/files will be used if they already exist so that you don't have any dupes from running multiple times.
 
 This means that you could sync your Desktop on a schedule 100x and you'd still just have one article, with directory listing!

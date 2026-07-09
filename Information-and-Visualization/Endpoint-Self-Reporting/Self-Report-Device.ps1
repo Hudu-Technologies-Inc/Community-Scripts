@@ -5,7 +5,16 @@
 # -------------------------------------------------------------------------
 $AzVault_HuduSecretName = "masontesting"                         # Name of your secret in AZure Keystore for your Hudu API key
 $AzVault_Name           = "hudu-pshell-learning"                 # Name of your Azure Keyvault
-$HuduBaseURL            = "https://YourHuduUrl.huducloud.com"    # URL of your Hudu Instance
+$useAZVAult = $false
+if ($true -eq $useAZVault){
+    $HuduBaseURL            = "https://YourHuduUrl.huducloud.com"    # URL of your Hudu Instance
+    $HuduAPIkey = $null                                              # leave null if using AZ vault
+} else {
+    $huduBaseURL =$huduBaseURL ?? $(read-host "Enter Hudu Base URL (e.g. https://myinstance.huducloud.com)")
+    $huduAPIkey = $huduAPIkey ?? $(read-host "Enter Hudu API Key")
+    clear-host
+}
+
 $CompanyName            = "Company to Record Into"               # Company Name (exact) which this device should be attributed to
 $HowOftenDays           = 2                                      # how often or how far back to record data for (in days)
 $HuduAssetLayoutName    = "Monitored Workstation"                # name of asset layout to create/use
@@ -44,10 +53,12 @@ function Get-PSVersionCompatible {
     }
 }
 Get-PSVersionCompatible
-foreach ($module in @('Az.KeyVault', 'HuduAPI')) {if (Get-Module -ListAvailable -Name $module) 
+$installModules = if ($true -eq $useAZVVault) {@('Az.KeyVault', 'HuduAPI')} else {@('HuduAPI')}
+
+foreach ($module in @($installModules)) {if (Get-Module -ListAvailable -Name $module) 
     { Write-Host "Importing module, $module..."; Import-Module $module } else {Write-Host "Installing and importing module $module..."; Install-Module $module -Force -AllowClobber; Import-Module $module }
 }
-if (-not (Get-AzContext)) { Connect-AzAccount };
+if ($true -eq $useAZVVault -and -not (Get-AzContext)) { Connect-AzAccount };
 function Set-HtmlTagAttributes {
     param(
         [Parameter(Mandatory)][string]$Html,
@@ -96,14 +107,16 @@ function Add-HtmlTableTheme {
     $styled = [regex]::Replace($Html, '<table\b', "<table class=""$TableClass""", 1)
     return $css + $styled
 }
+if ($true -eq $useAZVVault) {
+    $huduAPIkey = "$(Get-AzKeyVaultSecret -VaultName "$AzVault_Name" -Name "$AzVault_HuduSecretName" -AsPlainText)"
+}
+$huduAPIkey = $huduAPIkey ?? $(read-host "Enter Hudu API Key")
 
-New-HuduAPIKey "$(Get-AzKeyVaultSecret -VaultName "$AzVault_Name" -Name "$AzVault_HuduSecretName" -AsPlainText)"
+New-HuduAPIKey $huduAPIkey
 New-HuduBaseUrl $HuduBaseURL
 
 $Company = Get-HuduCompanies -name $CompanyName
 
-
-$Company = Get-HuduCompanies -name $CompanyName
 $cutoff = $(get-date).AddDays(-[math]::Abs([double]$HowOftenDays))
 if ($null -eq $company) {
     Write-Error "No company found with name: $CompanyName in $(Get-HuduBaseURL)"; exit

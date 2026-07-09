@@ -1,6 +1,17 @@
-$HuduBaseUrl = "https://yourhuduURL.huducloud.com"
+$UseAZVault = $false
+
+$HuduBaseUrl = $HuduBaseUrl ?? $null
 $HuduAPIKey = $HuduAPIKey ?? $null
-$UseAZVault = $true
+if ($false -eq $useAZVault) {
+    if ($null -eq $HuduAPIKey) {
+        $HuduAPIKey = $(read-host "Enter Hudu API key")
+        clear-host
+    }
+    if ($null -eq $huduBaseUrl){
+      $HuduBaseUrl = $(read-host "Enter Hudu Base URL")
+    }
+}
+
 $AzVault_HuduSecretName = "HuduAPIKeySecretName"                 # Name of your secret in AZure Keystore for your Hudu API key
 $AzVault_Name           = "MyVaultName"                          # Name of your Azure Keyvault
 $PreferredArticleTitle = "Hudu Health Report"
@@ -233,11 +244,12 @@ function Get-HuduModule {
     }
 }
 function Set-HuduInstance {
+    param ($huduBaseUrl,$huduAPIkey)
     $HuduBaseURL = $HuduBaseURL ?? 
         $((Read-Host -Prompt 'Set the base domain of your Hudu instance (e.g https://myinstance.huducloud.com)') -replace '[\\/]+$', '') -replace '^(?!https://)', 'https://'
     $HuduAPIKey = $HuduAPIKey ?? "$(read-host "Please Enter Hudu API Key")"
     while ($HuduAPIKey.Length -ne 24) {
-        $HuduAPIKey = (Read-Host -Prompt "Get a Hudu API Key from $($settings.HuduBaseDomain)/admin/api_keys").Trim()
+        $HuduAPIKey = (Read-Host -Prompt "Get a Hudu API Key from $($huduBaseurl)/admin/api_keys").Trim()
         if ($HuduAPIKey.Length -ne 24) {
             Write-Host "This doesn't seem to be a valid Hudu API key. It is $($HuduAPIKey.Length) characters long, but should be 24." -ForegroundColor Red
         }
@@ -424,7 +436,7 @@ function New-ConicDonutHtml {
 }
 
 
-Get-PSVersionCompatible; Get-HuduModule; Set-HuduInstance;
+Get-PSVersionCompatible; Get-HuduModule; Set-HuduInstance -huduBaseUrl $HuduBaseUrl -huduAPIkey $HuduAPIKey;
 #Get Upload Stats
 $companies = $(get-huducompanies)
 $uploads = $(get-huduuploads)

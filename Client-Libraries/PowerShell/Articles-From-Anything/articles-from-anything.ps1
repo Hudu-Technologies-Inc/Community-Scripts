@@ -11,6 +11,7 @@ $rxCssUrl    = [Regex]::new('url\(\s*(["'']?)(?<u>[^)"'']+)\1\s*\)', [RegexOptio
 $huduapikey = $huduapikey ?? $(read-host "Please enter hudu api key")
 $hudubaseurl = $hudubaseurl ?? $(read-host "please enter hudu instance url")
 function Set-HuduInstance {
+    param ($HuduBaseURL, $HuduAPIKey)
     $HuduBaseURL = $HuduBaseURL ?? 
         $((Read-Host -Prompt 'Set the base domain of your Hudu instance (e.g https://myinstance.huducloud.com)') -replace '[\\/]+$', '') -replace '^(?!https://)', 'https://'
     $HuduAPIKey = $HuduAPIKey ?? "$(read-host "Please Enter Hudu API Key")"
@@ -931,7 +932,7 @@ function Set-HuduArticleFromResourceFolder {
 }
 
 
-Get-PSVersionCompatible; Get-HuduModule; Set-HuduInstance; Get-HuduVersionCompatible;
+Get-PSVersionCompatible; Get-HuduModule; Set-HuduInstance -HuduBaseURL $hudubaseurl -HuduAPIKey $huduapikey; Get-HuduVersionCompatible;
 
 Write-Host @"
 You're all ready to go and create any articles you'd like, from

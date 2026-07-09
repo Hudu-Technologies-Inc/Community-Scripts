@@ -15,6 +15,29 @@ It matches assets by both `Company ID` and Serial Number, as not to overlap. It 
 
 <img width="3724" height="2048" alt="image" src="https://github.com/user-attachments/assets/9c0d7006-63a1-4ab8-9275-2b57e399a730" />
 
+## Quick-Start One-liners
+
+Open a new pwsh7 session on your windows device and perform one of the following:
+
+### the Ninja-Oneliner [Ninja-Style]
+
+```powershell
+irm 'https://raw.githubusercontent.com/Hudu-Technologies-Inc/Community-Scripts/refs/heads/main/Information-and-Visualization/Endpoint-Self-Reporting/Self-Report-Device.ps1' | iex
+```
+
+### Clone+Start [Samurai-Style] (requires git scm installed)
+
+```powershell
+git clone https://github.com/Hudu-Technologies-Inc/Community-Scripts; cd .\Community-Scripts\Information-and-Visualization\Endpoint-Self-Reporting; . .\Self-Report-Device.ps1;
+```
+
+### Download-Extract-Run [Ashigaru-Warrior-Style]
+
+```powershell
+Invoke-WebRequest https://codeload.github.com/Hudu-Technologies-Inc/Community-Scripts/zip/refs/heads/main -OutFile Community-Scripts.zip; Expand-Archive -Path .\Community-Scripts.zip; cd .\Community-Scripts\Community-Scripts-main\Information-and-Visualization\Endpoint-Self-Reporting; . .\Self-Report-Device.ps1;
+```
+
+
 While the provided 'blank slate' might be more than enough for some, It's pretty easy to add on to as well, if you find yourself in a position where you need to track more, or different, data you can do either of the following:
 
 Simply run this script to bring your plan to fruition. If a layout of the same name doesn't exist or has been removed, it will be created in Hudu as you describe in this script.
