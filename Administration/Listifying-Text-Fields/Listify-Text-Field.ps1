@@ -367,7 +367,7 @@ function Set-HuduInstance {
         $((Read-Host -Prompt 'Set the base domain of your Hudu instance (e.g https://myinstance.huducloud.com)') -replace '[\\/]+$', '') -replace '^(?!https://)', 'https://'
     $HuduAPIKey = $HuduAPIKey ?? "$(read-host "Please Enter Hudu API Key")"
     while ($HuduAPIKey.Length -ne 24) {
-        $HuduAPIKey = (Read-Host -Prompt "Get a Hudu API Key from $($settings.HuduBaseDomain)/admin/api_keys").Trim()
+        $HuduAPIKey = (Read-Host -Prompt "Get a Hudu API Key from $($HuduBaseURL)/admin/api_keys").Trim()
         if ($HuduAPIKey.Length -ne 24) {
             Write-Host "This doesn't seem to be a valid Hudu API key. It is $($HuduAPIKey.Length) characters long, but should be 24." -ForegroundColor Red
         }
