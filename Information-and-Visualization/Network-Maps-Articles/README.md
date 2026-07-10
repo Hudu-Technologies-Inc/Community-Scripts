@@ -29,24 +29,24 @@ To run once or to test it out, you'll want to make sure that your `$HuduBaseURL`
 
 ## Quick-Start One-liner
 
-Open a new pwsh7 session on your windows device and perform one of the following:
+Open a new pwsh7 session on your windows device and perform one of the following after replacing 'myurl.huducloud.com' with your hudu url.
 
 ### the Ninja-Oneliner [Ninja-Style]
 
 ```powershell
-irm 'https://raw.githubusercontent.com/Hudu-Technologies-Inc/Community-Scripts/refs/heads/main/Information-and-Visualization/Network-Maps-Articles/Network-Maps.ps1' | iex
+$huduBaseurl = "Myurl.huducloud.com"; irm 'https://raw.githubusercontent.com/Hudu-Technologies-Inc/Community-Scripts/refs/heads/main/Information-and-Visualization/Network-Maps-Articles/Network-Maps.ps1' | iex
 ```
 
 ### Clone+Start [Samurai-Style] (requires git scm installed)
 
 ```powershell
-git clone https://github.com/Hudu-Technologies-Inc/Community-Scripts; cd .\Community-Scripts\Information-and-Visualization\Network-Maps-Articles; . .\Network-Maps.ps1;
+$huduBaseurl = "Myurl.huducloud.com"; git clone https://github.com/Hudu-Technologies-Inc/Community-Scripts; cd .\Community-Scripts\Information-and-Visualization\Network-Maps-Articles; . .\Network-Maps.ps1;
 ```
 
 ### Download-Extract-Run [Ashigaru-Warrior-Style]
 
 ```powershell
-Invoke-WebRequest https://codeload.github.com/Hudu-Technologies-Inc/Community-Scripts/zip/refs/heads/main -OutFile Community-Scripts.zip; Expand-Archive -Path .\Community-Scripts.zip; cd .\Community-Scripts\Community-Scripts-main\Information-and-Visualization\Network-Maps-Articles; . .\Network-Maps.ps1;
+$huduBaseurl = "Myurl.huducloud.com"; Invoke-WebRequest https://codeload.github.com/Hudu-Technologies-Inc/Community-Scripts/zip/refs/heads/main -OutFile Community-Scripts.zip; Expand-Archive -Path .\Community-Scripts.zip; cd .\Community-Scripts\Community-Scripts-main\Information-and-Visualization\Network-Maps-Articles; . .\Network-Maps.ps1;
 ```
 
 ## Run on a schedule
