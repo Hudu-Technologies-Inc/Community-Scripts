@@ -327,7 +327,7 @@ function Get-HuduModule {
 }
 function Get-HuduVersionCompatible {
     param (
-        [version]$RequiredHuduVersion = [version]"2.37.1",
+        [version]$RequiredHuduVersion = [version]"2.43.1",
         $DisallowedVersions = @([version]"2.37.0")
     )
     Write-Host "Required Hudu version: $requiredversion" -ForegroundColor Blue
