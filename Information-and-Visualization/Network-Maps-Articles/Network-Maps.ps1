@@ -1800,7 +1800,7 @@ function Select-ObjectFromList($objects, $message, $inspectObjects = $false, $al
 
 function Get-HuduVersionCompatible {
     param (
-        [string]$requiredVersion = "2.39.2",
+        [string]$requiredVersion = "2.43.1",
         $DisallowedVersions = @(([version]"2.37.0"))
     )
     $RequiredHuduVersion = $([version]$requiredVersion)
@@ -1914,7 +1914,7 @@ if ($HuduBaseURL -eq "https://YourHuduUrl.huducloud.com"){
 }
 
 
-Get-PSVersionCompatible; Get-HuduModule; Set-HuduInstance -HuduBaseURL $HuduBaseURL -HuduAPIKey $HuduAPIKey; Get-HuduVersionCompatible -requiredVersion $(if ($NetworkMapOutputFormat -eq "Mermaid") { "2.43.0" } else { "2.39.2" });
+Get-PSVersionCompatible; Get-HuduModule; Set-HuduInstance -HuduBaseURL $HuduBaseURL -HuduAPIKey $HuduAPIKey; Get-HuduVersionCompatible -requiredVersion $(if ($NetworkMapOutputFormat -eq "Mermaid") { "2.43.1" } else { "2.43.1" });
 $IconHrefByType = @{}
 if ($NetworkMapOutputFormat -eq "SvgHtml") {
   $attributableArticle = Get-HuduArticles -name "Network Maps Icons" | select-object -first 1

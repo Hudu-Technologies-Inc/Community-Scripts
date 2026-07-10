@@ -90,7 +90,7 @@ Relationship lines stay shortest and least tangled when strongly connected cards
 
 - **PowerShell 7.5.1 or newer** (the script checks this on startup).
 - The **[HuduAPI PowerShell module](https://github.com/Hudu-Technologies-Inc/HuduAPI)** version 3.0.0 or newer. The script will fetch/import it automatically if it isn't already available.
-- A **Hudu instance on version 2.39.2 or newer**, plus an API key (Admin → API).
+- A **Hudu instance on version 2.43.1 or newer**, plus an API key (Admin → API).
 
 ## Setup
 

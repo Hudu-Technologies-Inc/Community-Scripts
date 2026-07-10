@@ -469,7 +469,7 @@ function Get-Similarity {
 
 function Get-HuduVersionCompatible {
     param (
-        [string]$requiredVersion = "2.39.2",
+        [string]$requiredVersion = "2.43.1",
         $DisallowedVersions = @(([version]"2.37.0"))
     )
     $RequiredHuduVersion = $([version]$requiredVersion)

@@ -19,7 +19,7 @@ Each pin is clickable and will lead you right to that location (or if it's the c
 ## What You Need Before You Start:
 
 - PowerShell 7 or later
-- Hudu version 2.39.3 or later.
+- Hudu version 2.43.1 or later.
 - Hudu instance with API Access
 - Mapbox Account / Public Access Token (its the one that starts with 'pk...')
 

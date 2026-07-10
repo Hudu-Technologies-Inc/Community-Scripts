@@ -24,7 +24,7 @@ You can choose not to use the automation part, and fill out custom data to be pu
 ## What You Need Before You Start:
 
 - PowerShell 7 or later
-- Hudu Version 2.39.3 or later
+- Hudu Version 2.43.1 or later
 - Azure PowerShell module (Install-Module Az)
 - HuduAPI PowerShell module (Install-Module HuduAPI)
 - Entra ID (Azure AD) account with access to Key Vault
