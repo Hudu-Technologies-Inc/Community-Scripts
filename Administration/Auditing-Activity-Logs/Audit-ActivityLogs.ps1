@@ -37,11 +37,11 @@ function Get-HuduModule {
     if (Test-Path $HAPImodulePath) {
         Import-Module $HAPImodulePath -Force
         Write-Host "Module imported from $HAPImodulePath"
-    } elseif ((Get-Module -ListAvailable -Name HuduAPI).Version -ge [version]'2.4.4') {
+    } elseif ((Get-Module -ListAvailable -Name HuduAPI).Version -ge [version]'4.1.0') {
         Import-Module HuduAPI
         Write-Host "Module 'HuduAPI' imported from global/module path"
     } else {
-        Install-Module HuduAPI -MinimumVersion 2.4.5 -Scope CurrentUser -Force
+        Install-Module HuduAPI -MinimumVersion 4.1.0 -Scope CurrentUser -Force
         Import-Module HuduAPI
         Write-Host "Installed and imported HuduAPI from PSGallery"
     }
