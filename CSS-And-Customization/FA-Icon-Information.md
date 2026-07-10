@@ -1,4 +1,4 @@
-# FontAwesome Icons found In Hudu 2.39.3 as of Jul 10, 2026
+# FontAwesome Icons found In Hudu 2.43.2 as of Jul 10, 2026
 
 these can be used for icon-replacement or for selective application of CSS
 
