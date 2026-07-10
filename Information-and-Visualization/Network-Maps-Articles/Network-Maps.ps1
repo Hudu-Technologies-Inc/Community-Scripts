@@ -639,6 +639,20 @@ function Get-NetworkContext {
   }
 }
 
+function Test-NetworkMapContextHasChartData {
+  param(
+    [object[]]$Contexts
+  )
+
+  foreach ($ctx in @($Contexts)) {
+    if (-not $ctx) { continue }
+    if ($ctx.Vlan -or $ctx.Zone) { return $true }
+    if (@($ctx.Addresses | Where-Object { $_ }).Count -gt 0) { return $true }
+  }
+
+  return $false
+}
+
 
 function Get-SafeFilename {
     param([string]$Name,
@@ -2040,6 +2054,12 @@ foreach ($network in $allNetworks) {
       MaxWebsitesPerAddress      = $MaxWebsitesPerAddress
     }
     Get-NetworkContext @ctxArgs
+  }
+
+  if (-not (Test-NetworkMapContextHasChartData -Contexts $ctxs)) {
+    $networkLabel = $network.description ?? $network.name ?? $network.address ?? "Network $($network.id)"
+    Write-Host "Skipping '$networkLabel' network map; no IPs, VLANs, or zones found." -ForegroundColor Yellow
+    continue
   }
 
   $html = switch ($NetworkMapOutputFormat) {
