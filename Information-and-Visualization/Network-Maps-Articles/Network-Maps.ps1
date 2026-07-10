@@ -641,11 +641,13 @@ function Get-NetworkContext {
 
 function Test-NetworkMapContextHasChartData {
   param(
-    [object[]]$Contexts
+    [object[]]$Contexts,
+    [AllowNull()]$NetworkId = $null
   )
 
   foreach ($ctx in @($Contexts)) {
     if (-not $ctx) { continue }
+    if ($null -ne $NetworkId -and "$($ctx.Network.id)" -ne "$NetworkId") { continue }
     if ($ctx.Vlan -or $ctx.Zone) { return $true }
     if (@($ctx.Addresses | Where-Object { $_ }).Count -gt 0) { return $true }
   }
@@ -1680,11 +1682,9 @@ function New-NetworkMapMermaidArticle {
     AddClassAssignment -Diagram $diagram -Ids $ids -ClassName $statusClassName
   }
 
-  $target = if ($OpenLinksInNewWindow) { '_blank' } else { '_self' }
   foreach ($node in @($nodes.Values | Where-Object { $_.Url })) {
     $url = ConvertTo-MermaidQuotedText $node.Url
-    $tooltip = ConvertTo-MermaidQuotedText "$($node.Type): $($node.Label)"
-    [void]$diagram.AppendLine("  click $($node.Id) href `"$url`" `"$tooltip`" $target")
+    [void]$diagram.AppendLine("  click $($node.Id) href `"$url`"")
   }
 
   $mermaid = $diagram.ToString().Trim()
@@ -2056,7 +2056,7 @@ foreach ($network in $allNetworks) {
     Get-NetworkContext @ctxArgs
   }
 
-  if (-not (Test-NetworkMapContextHasChartData -Contexts $ctxs)) {
+  if (-not (Test-NetworkMapContextHasChartData -Contexts $ctxs -NetworkId $network.id)) {
     $networkLabel = $network.description ?? $network.name ?? $network.address ?? "Network $($network.id)"
     Write-Host "Skipping '$networkLabel' network map; no IPs, VLANs, or zones found." -ForegroundColor Yellow
     continue
