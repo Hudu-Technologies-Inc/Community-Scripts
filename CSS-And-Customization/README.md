@@ -16,3 +16,7 @@
 ## Other Resources:
 
 [![Video: Hudu- Adding Your Logo](https://img.youtube.com/vi/GAFcewE9KVw/0.jpg)](https://youtu.be/GAFcewE9KVw)
+
+## External/Unofficial (but extremely cool) Resources:
+
+- Hudu Themes by [Limehawk](https://limehawk.io) — a brilliant project with hundreds of beautiful drop-in CSS themes for Hudu, each in light and dark. Browse and preview them all at [huduthemes.com](https://huduthemes.com) (with one-click copy), then Paste a theme into Admin → Design → Custom CSS and you're styled. (MIT license)
