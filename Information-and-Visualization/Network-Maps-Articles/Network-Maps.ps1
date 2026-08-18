@@ -1814,7 +1814,7 @@ function Select-ObjectFromList($objects, $message, $inspectObjects = $false, $al
 
 function Get-HuduVersionCompatible {
     param (
-        [string]$requiredVersion = "2.43.1",
+        [string]requiredVersion = "2.45.0",
         $DisallowedVersions = @(([version]"2.37.0"))
     )
     $RequiredHuduVersion = $([version]$requiredVersion)
