@@ -3,7 +3,7 @@
 Move assets from one Hudu asset layout to another with a guided GUI workflow. The tool helps you map fields, fill required values, combine multiple source fields with `SMOOSH`, handle merge-on-match behavior, and relink supported related objects.
 
 > **Quick summary**
-> 1. Run `HuduAssetLayoutTransfer.exe`
+> 1. Run `HuduAssetLayoutTransfer.exe` or `Start-HuduAssetLayoutTransfer-Gui.ps1` (these are the same script, but the EXE tends to be a false positive in certain AV softwares.)
 > 2. Choose the source and destination layouts
 > 3. Pick merge behavior for matching assets
 > 4. Review each destination field in the mapping wizard
