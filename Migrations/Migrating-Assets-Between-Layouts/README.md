@@ -3,7 +3,7 @@
 Move assets from one Hudu asset layout to another with a guided GUI workflow. The tool helps you map fields, fill required values, combine multiple source fields with `SMOOSH`, handle merge-on-match behavior, and relink supported related objects.
 
 > **Quick summary**
-> 1. Run `HuduAssetLayoutTransfer.exe` or `Start-HuduAssetLayoutTransfer-Gui.ps1` (these are the same script, but the EXE tends to be a false positive in certain AV softwares.)
+> 1. Run `HuduAssetLayoutTransfer.exe`, double-click `Start-HuduAssetLayoutTransfer.cmd`, or run `Start-HuduAssetLayoutTransfer.ps1` with PowerShell 7
 > 2. Choose the source and destination layouts
 > 3. Pick merge behavior for matching assets
 > 4. Review each destination field in the mapping wizard
@@ -55,6 +55,14 @@ For best results, use a full-permission API key rather than a narrowly scoped co
 
 Run `HuduAssetLayoutTransfer.exe`.
 
+For a standalone PowerShell launch without building or distributing an EXE, run:
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\Start-HuduAssetLayoutTransfer.ps1
+```
+
+To launch from Explorer, double-click `Start-HuduAssetLayoutTransfer.cmd`. The command launcher finds PowerShell 7 and starts the GUI script with `pwsh.exe`.
+
 <img width="404" height="169" alt="Launch screen" src="https://github.com/user-attachments/assets/732b0873-4c1c-42f2-b202-5cc362bdd6f8" />
 
 The tool opens a GUI window and a terminal window. The terminal is mainly there for logging and troubleshooting.
@@ -69,6 +77,7 @@ Provide your Hudu URL and API key.
 
 Pick the layout you are moving **from** and the layout you are moving **to**.
 
+
 If you are confident with your source/dest selection, it's generally a good idea to archive source data afterwards.
 
 
@@ -76,7 +85,7 @@ If you are confident with your source/dest selection, it's generally a good idea
 
 You will then get a confirmation step to review or change the selection.
 
-<img width="1488" height="772" alt="image" src="https://github.com/user-attachments/assets/ee8477f3-7c28-4ac8-b717-a79a60526abc" />
+<img width="1488" height="772" alt="image" src="https://github.com/user-attachments/assets/335ff802-1529-4d93-ab08-3d24d09b5532" />
 
 If an incoming source asset appears to match an existing destination asset, you can choose how the tool should behave.
 
@@ -89,11 +98,11 @@ You can match on any source field and any source field type. Dates, ListSelects,
 
 The form will hint the number of assets that fall under your chosen filter.
 
-<img width="1520" height="724" alt="image" src="https://github.com/user-attachments/assets/e7d3048a-11cd-42dc-804d-7d47d67f33c9" />
+<img width="1520" height="724" alt="image" src="https://github.com/user-attachments/assets/7bc9709a-799d-459d-83a6-fc7c395faff7" />
 
 ### 4-C Set final strategies for fields, 'smoosh' application, and relations
 
-<img width="1610" height="738" alt="image" src="https://github.com/user-attachments/assets/f6c78814-8de0-45dd-995c-34daff613167" />
+<img width="1610" height="738" alt="image" src="https://github.com/user-attachments/assets/b91add5c-12c1-4fba-9423-2784c5e81a40" />
 
 pretty straightforward, Including blank values in smoosh and keeping HTML intact is usually not desirable [depending on circumstances] and will be disabled if no smoosh source/target was selected. 
 
@@ -169,7 +178,8 @@ For `ListSelect` destination fields, choose a source field and define which sour
 
 ---
 
-<img width="2104" height="1410" alt="image" src="https://github.com/user-attachments/assets/987c0ba5-80ed-4d96-8b78-0a2c9e018831" />
+<img width="2104" height="1410" alt="image" src="https://github.com/user-attachments/assets/a1d6c22a-53cd-43fb-b404-d3bc7390d697" />
+
 
 
 This is helpful when the source data is inconsistent and needs to be normalized into one controlled list.
@@ -245,11 +255,11 @@ Very short names are intentionally not matched too aggressively.
 
 When custom matching criteria are enabled, those configured criteria replace the default name matcher. The transfer checks the primary criterion first, then secondary, then tertiary; blank source values are skipped for that criterion. Direct matching compares trimmed text case-insensitively, while the broader option matches when either value contains the other. If a criterion narrows the result to multiple destination assets, the next criterion is used to keep narrowing.
 
-<img width="1816" height="672" alt="image" src="https://github.com/user-attachments/assets/ba88f9d3-05ac-47f2-a90c-41c3fb5bd230" />
+<img width="1816" height="672" alt="image" src="https://github.com/user-attachments/assets/aecf94b3-b436-41c0-89b6-7845e2a353cb" />
 
 This matching logic helps prevent accidental duplicates while still allowing flexible merge behavior.
 
-<img width="1584" height="324" alt="image" src="https://github.com/user-attachments/assets/7c40111a-6448-4f1e-8e9f-bf97a6382b5c" />
+<img width="1584" height="324" alt="image" src="https://github.com/user-attachments/assets/35716e18-2a86-480a-a4e9-9dd41b75885d" />
 
 ---
 
@@ -338,3 +348,4 @@ $includeLabelInSmooshedValues = $true
 - `v1.0` - Finalized GUI, added forward,back buttons, and field indicator panel.
 - `v1.2` - Consolidated forms for easier review / navigation, added source-data filter for mapped or L2L migrations
 - `v1.3` - Addition of Custom Matching Criteria and Conditions, Matching behavior customization, May 28, 2026
+- `v1.4` - Standalone pwsh7 script, launcher, and exe
