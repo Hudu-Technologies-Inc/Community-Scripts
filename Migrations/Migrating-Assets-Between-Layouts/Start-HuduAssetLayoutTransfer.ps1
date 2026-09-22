@@ -1,3 +1,22 @@
+[CmdletBinding()]
+param(
+    [string]$JobPath,
+    [switch]$NoAutoLaunch
+)
+
+if ($PSBoundParameters.ContainsKey('JobPath')) {
+    $script:JobPath = $JobPath
+    if (-not [string]::IsNullOrWhiteSpace($JobPath)) {
+        $env:HUDU_LAYOUT_TRANSFER_JOB_PATH = $JobPath
+    }
+    else {
+        Remove-Item -Path Env:\HUDU_LAYOUT_TRANSFER_JOB_PATH -ErrorAction SilentlyContinue
+    }
+}
+elseif (-not [string]::IsNullOrWhiteSpace($env:HUDU_LAYOUT_TRANSFER_JOB_PATH)) {
+    $script:JobPath = $env:HUDU_LAYOUT_TRANSFER_JOB_PATH
+}
+
 if (-not $script:Root -or [string]::IsNullOrWhiteSpace($script:Root)) {
     $script:Root = if (-not [string]::IsNullOrWhiteSpace($env:HUDU_LAYOUT_TRANSFER_ROOT)) {
         $env:HUDU_LAYOUT_TRANSFER_ROOT
@@ -5421,4 +5440,9 @@ function New-GuiJob {
 
         $results | convertto-json -depth 99 | Out-File -FilePath (Join-Path $script:Root "transferresults_$(Get-Date -Format 'yyyyMMdd_HHmmss').json") -Encoding utf8
         exit 0
+}
+
+if (-not $NoAutoLaunch -and $MyInvocation.InvocationName -ne '.') {
+    $script:Gui = $true
+    New-GuiJob
 }
