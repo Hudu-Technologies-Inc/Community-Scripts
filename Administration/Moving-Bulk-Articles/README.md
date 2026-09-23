@@ -1,6 +1,6 @@
 # Moving Articles
 
-**A friendly, safety-first way to move Hudu knowledge base articles between central and company KBs.**
+**A friendly, safety-first way to move many Hudu knowledge base articles between central and company KBs.**
 
 Moving knowledge base content can feel a little nerve-wracking. This tool is designed to make the process calmer: it starts in dry-run mode, shows you what it plans to do, preserves folder structure by default, and writes a CSV report every time it runs.
 
@@ -38,9 +38,34 @@ The guided wizard is the easiest starting point if you are not sure which option
 
 When the script starts, it will prompt for your Hudu base URL and API key if they are not already available in the session.
 
+
 ## Try it safely first
 
 The script defaults to dry-run mode. That means you can run a command, review what would happen, and check the CSV report before anything in Hudu changes.
+
+### Some Ninja One-Liners to Start
+
+Open a new pwsh7 session on your windows device and perform one of the following:
+
+the Ninja-Oneliner [Ninja-Style]
+
+```powershell
+irm 'https://raw.githubusercontent.com/Hudu-Technologies-Inc/Community-Scripts/refs/heads/main/Administration/Moving-Bulk-Articles/Article-Wizard.ps1 -wizard' | iex
+```
+
+Clone+Start [Samurai-Style] (requires git scm installed)
+
+```powershell
+git clone https://github.com/Hudu-Technologies-Inc/Community-Scripts; cd .\Community-Scripts\Administration\Moving-Bulk-Articles; . .\Article-Wizard.ps1 -wizard;
+```
+
+Download-Extract-Run [Ashigaru-Warrior-Style]
+
+```powershell
+Invoke-WebRequest https://codeload.github.com/Hudu-Technologies-Inc/Community-Scripts/zip/refs/heads/main -OutFile Community-Scripts.zip; Expand-Archive -Path .\Community-Scripts.zip; cd .\Community-Scripts\Community-Scripts-main\Administration\Moving-Bulk-Articles; . .\Article-Wizard.ps1 -wizard;
+```
+
+### Some Local Commands (if downloaded or cloned locally)
 
 Move articles from a company KB to the central KB:
 
