@@ -47,22 +47,22 @@ The script defaults to dry-run mode. That means you can run a command, review wh
 
 Open a new pwsh7 session on your windows device and perform one of the following:
 
-the Ninja-Oneliner [Ninja-Style]
+Ninja-Oneliner [Ninja-Style]
 
 ```powershell
-irm 'https://raw.githubusercontent.com/Hudu-Technologies-Inc/Community-Scripts/refs/heads/main/Administration/Moving-Bulk-Articles/Article-Wizard.ps1 -wizard' | iex
+$script = [scriptblock]::Create((irm 'https://raw.githubusercontent.com/Hudu-Technologies-Inc/Community-Scripts/refs/heads/main/Administration/Moving-Bulk-Articles/Article-Wizard.ps1')); & $script -Wizard
 ```
 
-Clone+Start [Samurai-Style] (requires git scm installed)
+Clone+Start [Samurai-Style]
 
 ```powershell
-git clone https://github.com/Hudu-Technologies-Inc/Community-Scripts; cd .\Community-Scripts\Administration\Moving-Bulk-Articles; . .\Article-Wizard.ps1 -wizard;
+git clone https://github.com/Hudu-Technologies-Inc/Community-Scripts.git;  cd .\Community-Scripts\Administration\Moving-Bulk-Articles;  . .\Article-Wizard.ps1 -Wizard;
 ```
 
 Download-Extract-Run [Ashigaru-Warrior-Style]
 
 ```powershell
-Invoke-WebRequest https://codeload.github.com/Hudu-Technologies-Inc/Community-Scripts/zip/refs/heads/main -OutFile Community-Scripts.zip; Expand-Archive -Path .\Community-Scripts.zip; cd .\Community-Scripts\Community-Scripts-main\Administration\Moving-Bulk-Articles; . .\Article-Wizard.ps1 -wizard;
+Invoke-WebRequest 'https://codeload.github.com/Hudu-Technologies-Inc/Community-Scripts/zip/refs/heads/main' -OutFile .\Community-Scripts.zip; Expand-Archive -Path .\Community-Scripts.zip -DestinationPath .\Community-Scripts -Force; cd .\Community-Scripts\Community-Scripts-main\Administration\Moving-Bulk-Articles; . .\Article-Wizard.ps1 -Wizard;
 ```
 
 ### Some Local Commands (if downloaded or cloned locally)
