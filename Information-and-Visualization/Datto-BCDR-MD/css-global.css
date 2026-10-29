@@ -1,0 +1,22 @@
+/*
+ * DATTO-BCDR-MAGIC-DASH optional Hudu custom CSS.
+ *
+ * The generated Magic Dash already carries its own scoped stylesheet, so this
+ * file is optional. It exists only for containers that Hudu renders *around*
+ * the Magic Dash, which its scoped stylesheet cannot reach from the inside.
+ *
+ * Every rule below is constrained with :has(.datto-magic-dash) so it applies
+ * only to containers that hold DATTO-BCDR-MAGIC-DASH content. Unrelated Hudu
+ * unrelated Hudu content is never restyled by this file.
+ */
+
+/* Hudu fixes Magic Dash block height; our content sizes itself. */
+.nasa__block:has(.datto-magic-dash) {
+    height: auto;
+}
+
+/* Keep a long dashboard from forcing the surrounding page to scroll sideways. */
+.nasa__content:has(.datto-magic-dash) {
+    max-width: 100%;
+    min-width: 0;
+}

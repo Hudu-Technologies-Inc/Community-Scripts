@@ -31,6 +31,8 @@ Collection of Hudu Community Scripts for anyone to use/run/remix/reference.
   - [Managing Magic Dashes](Information-and-Visualization/Managing-MagicDashes/)
   - [(Mermaid Chart) Network Maps](Information-and-Visualization/Network-Maps-Articles/)
   - [(Mermaid Chart) Relationship Charts](Information-and-Visualization/Relation-Charts/)
+  - [Datto BCDR Magic Dash](Information-and-Visualization/Datto-BCDR-MD/)
+  - [Axcient Magic Dash](Information-and-Visualization/Axcient-MD/)
 
 
 - **Migrations**

@@ -1,0 +1,15 @@
+config.json
+config.json.*
+logs/
+.sync.lock
+# The bundled runtime is source-controlled. Override repository-wide native
+# extension and certificate ignores for these two required artifact types.
+!Runtime/**/*.pyd
+!Runtime/**/*.pem
+TestResults/
+*.xml
+*.clixml
+*.tmp
+*.bak
+.dist-staging-*/
+.dist-previous-*/
