@@ -1,0 +1,44 @@
+/* Optional healthy Magic Dash shade: datto */
+.custom-fast-fact.custom-fast-fact--datto .custom-fast-fact__header img {
+    background-color: white;
+    border-radius: 4px;
+}
+
+.custom-fast-fact.custom-fast-fact--datto .custom-fast-fact__header h1,
+.custom-fast-fact.custom-fast-fact--datto .custom-fast-fact__footer a {
+    font-size: 1.1em;
+}
+
+.custom-fast-fact.custom-fast-fact--datto {
+    background: linear-gradient(to bottom right, #6136FF, #7350FF, #4B21D6);
+}
+
+/* Optional warning Magic Dash shade: dattowarning */
+.custom-fast-fact.custom-fast-fact--dattowarning .custom-fast-fact__header img {
+    background-color: white;
+    border-radius: 4px;
+}
+
+.custom-fast-fact.custom-fast-fact--dattowarning .custom-fast-fact__header,
+.custom-fast-fact.custom-fast-fact--dattowarning .custom-fast-fact__footer a {
+    background-color: #E5544B;
+    color: white;
+}
+
+.custom-fast-fact.custom-fast-fact--dattowarning p {
+    background-color: #2B171A;
+    border: 3px solid #E5544B;
+    border-radius: 12px;
+    padding: 0.25em;
+    width: 95%;
+}
+
+.custom-fast-fact.custom-fast-fact--dattowarning {
+    background: repeating-linear-gradient(
+        45deg,
+        #E5544B,
+        #E5544B 10px,
+        #2B171A 10px,
+        #2B171A 20px
+    );
+}

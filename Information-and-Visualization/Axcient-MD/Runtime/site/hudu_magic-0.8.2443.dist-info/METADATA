@@ -1,0 +1,737 @@
+Metadata-Version: 2.4
+Name: hudu-magic
+Version: 0.8.2443
+Summary: Python client library for the Hudu API
+Author: Mason Stelter
+License-Expression: MIT
+Keywords: hudu,api,client,documentation
+Classifier: Development Status :: 5 - Production/Stable
+Classifier: Intended Audience :: Developers
+Classifier: Operating System :: OS Independent
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3 :: Only
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Programming Language :: Python :: 3.13
+Classifier: Programming Language :: Python :: 3.14
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: requests>=2.31.0
+Requires-Dist: typing-extensions>=4.0.0
+Provides-Extra: dev
+Requires-Dist: pytest>=8.0; extra == "dev"
+Requires-Dist: python-dotenv>=1.0.1; extra == "dev"
+Requires-Dist: ruff>=0.6.0; extra == "dev"
+Requires-Dist: build>=1.2.0; extra == "dev"
+Requires-Dist: twine>=5.0.0; extra == "dev"
+Dynamic: license-file
+
+# hudu-magic
+
+The *Official* **tiny, enum-driven, class-based Python API client** for **Hudu**.
+
+- Minimal dependencies (requests)
+- Generated from OpenAPI  
+- Low Maintenance
+- Designed for clarity and maintainability
+
+
+---
+
+[PyWheels](https://www.piwheels.org/project/hudu-magic/)
+
+[PyPi](https://pypi.org/project/hudu-magic/)
+
+---
+
+# Quick Start
+
+```python
+from hudu_magic import HuduClient
+
+client = HuduClient(
+    api_key="your_api_key",
+    instance_url="https://yourinstance.huducloud.com"
+)
+
+company = client.companies.create(name="Test Company")
+
+# Use a real asset_layout_id from your Hudu instance (e.g. from client.asset_layouts.list()).
+asset = client.assets.create(
+    company_id=company.id,
+    name="Router",
+    asset_layout_id=1,
+)
+
+asset.name = "Updated Router"
+asset.save()
+
+asset.delete()
+```
+
+---
+
+# Installation
+
+## Install package
+
+```bash
+pip install hudu-magic
+```
+---
+
+# Usage Info and Guide
+
+There are several examples in the examples folder that might be helpful if you're just starting out
+
+# Core Concepts
+
+## Client
+Handles auth, requests, pagination, wrapping.
+
+```python
+client.assets.list()
+```
+
+## Collections
+Collection-level operations:
+- list()
+- get()
+- create()
+- delete()
+- archive()
+- unarchive()
+
+```python
+assetsforcompany.save()
+assetsforcompany.delete()
+assetsforcompany.archive()
+```
+
+## Models (HuduObject)
+Instance-level operations:
+- save()
+- delete()
+- refresh()
+- relate_to()
+- list_photos()
+- list_uploads()
+- relate_to()
+- upload_to()
+- add_label() / assign_label()
+- list_labels()
+- strip_labels()
+
+```python
+asset.save()
+asset.delete()
+asset.add_label(priority_type)
+```
+
+## Special Model Methods
+
+### Assets
+
+```python
+someasset.add_public_photo("smile.png")
+someasset.add_photo("dogslaughing.jpeg")
+```
+
+some objects can be attributed directly to or uploaded to assets
+
+### Companies
+
+```python
+mycompany.list_assets()
+mycompany.list_articles()
+mycompany.list_passwords()
+mycompany.list_procedures()
+mycompany.list_websites()
+mycompany.list_folders()
+mycompany.list_password_folders()
+
+
+mycompany.create_website()
+mycompany.create_password()
+mycompany.create_procedure()
+mycompany.create_article()
+mycompany.create_asset()
+```
+
+objects that require or can be attributed to a company often can be listed or created directly from a company object
+
+### Exports
+
+#### starting a CSV or PDF export
+
+```python
+newexport = client.exports.start(format="pdf", company_id=1, asset_layout_ids=[2],
+    include_passwords= True,
+    include_websites= True,
+    include_articles= True,
+    include_archived_articles= True,
+    include_archived_passwords= True,
+    include_archived_websites= True,
+    include_archived_assets= True,
+    )
+```
+
+client.Exports.new() is aliased to client.Exports.start()
+```python
+csvexport = client.exports.start(format="csv",company_id=mycompany.id)
+pdfexport = client.exports.start(format="pdf",company_id=mycompany.id)
+```
+
+
+##### Friendly defaults on create
+
+the include_* options here default to true if not provided
+
+the asset layout array defaults to all layouts found with `HuduClient.asset_layouts.list` are included.
+
+#### Checking status of export
+
+blocking-check on export status
+
+```python
+ready = client.exports.wait_until_downloadable(newexport, interval=2.0, timeout=3600)
+someexport.wait_until_downloadable(interval=5.0, timeout=600)
+```
+
+#### downloading exports
+
+```python
+download = client.exports.download(newexport.id, "/home/myoutputfolder")
+download = client.exports.download(otherexportobject) # download to current working dir
+someexportobject.download() # download to current working dir
+myexportobject.download("/home/myoutputfolder")
+```
+
+### Asset Layouts and Fields
+
+**`AssetLayout.to_create_payload()`** builds the same JSON body as **`normalize_layout_for_create`** on that layout’s underlying data. Prefer `to_create_payload` whenever you already have (or can wrap) an **`AssetLayout`**. Use **`normalize_layout_for_create`** only when you have a plain **`dict`** and no instance yet (for example after `json.load`).
+
+**Clone an existing layout** (GET-shaped data normalized for `POST`):
+
+```python
+mylayout = client.asset_layouts.get(2)
+payload = mylayout.to_create_payload()
+payload["name"] = "Updated New Layout"
+newlayout = client.asset_layouts.create(payload=payload)
+print(f"created new layout: {newlayout.name}")
+```
+
+**Create a layout from scratch** by wrapping a draft dict in `AssetLayout`, then calling `to_create_payload`. You can omit `position` on fields; contiguous positions and icon / include defaults are applied for you. For **`ListSelect`** fields you need a real **`list_id`** from your instance.
+
+```python
+from hudu_magic.endpoints import HuduEndpoint
+from hudu_magic.models import AssetLayout
+
+draft = AssetLayout(
+    client,
+    HuduEndpoint.ASSET_LAYOUTS,
+    {
+        "name": "Docking stations",
+        "fields": [
+            {"label": "Asset tag", "field_type": "Text"},
+            {"label": "Room", "field_type": "Text"},
+        ],
+    },
+)
+payload = draft.to_create_payload()
+layout = client.asset_layouts.create(payload=payload)
+```
+
+**Dict only, no `AssetLayout` yet** (same payload shape as above):
+
+```python
+from hudu_magic import normalize_layout_for_create
+
+layout_dict = {"name": "Docking stations", "fields": [{"label": "x", "field_type": "Text"}]}
+payload = normalize_layout_for_create(layout_dict)
+# pass `payload` to client.asset_layouts.create(payload=payload) when you have a client
+```
+
+### Layout Fields
+
+Below are the valid layout field types (as of May11, 2026). These fields have different requirements and validation is intentionally somewhat loose for most of these, so that any error codes present will be reflected directly by Hudu itself. Not to worry, however, Hudu field validation does not change wildly.
+
+- Text
+- Number
+- CheckBox
+- Website
+- AssetTag
+- Email
+- Phone
+- Date
+- RichText
+- Heading
+- Password
+- ListSelect
+
+
+Website fields (which require https:// prefix) are automagically handled
+Number fields must be an integer, but we safely coerce when possible from float, double, oer either as number-string ("1" or "44.7")
+
+### Procedures (processes) and tasks
+
+The API and OpenAPI 2.41.0 use **process** / **run** wording; this library still exposes `Procedure` / `procedure_tasks` and the `client.procedure` / `client.procedure_tasks` aliases (`client.process`, `client.tasks`, etc.).
+
+```python
+myprocedure.kick_off()
+myprocedure.kickoff()
+myprocedure.start()
+
+myprocedure.is_run #bool property
+
+companyprocedures = mycompany.list_procedures()
+procedures = client.procedures.list()
+
+myprocedure = client.procedures.create(payload={"name": "asdf", "company_id": 1})
+myprocedure.add_task(name="newtask", auto_kickoff=True)
+
+client.procedure_task.create(name="newtask", procedure_id=myprocedure.id)
+
+# One procedure only — not on .list() results
+proc = client.procedures.get(id=1)
+proc.add_task(name="Step 1", auto_kickoff=True)
+
+someprocedure.list_tasks()
+someotherprocedure.tasks
+
+sometask.assign_to(mypersonaluser)
+```
+
+Calling `kick_off`, `kickoff`, or `start` returns a new **run** (still a `Procedure` with `is_run` true). Runs share the same model as templates but behave differently for tasks.
+
+Use `is_run` to tell a template from a run.
+
+**Creating tasks** (`POST /procedure_tasks`) is for **process** (template) tasks only: supported body fields include `name`, `description`, `procedure_id`, `position`, `optional`, and `parent_task_id`. You cannot set assignees or run-only fields on create; kick off the process first, then set **`due_date`**, **`priority`**, and **`assigned_users`** on the **run** task via `PUT /procedure_tasks/{id}`, or use `Users.assign_task` (which updates `assigned_users` on the run task).
+
+**Updating a procedure/run** (`PUT /procedures/{id}`) accepts **`name`**, **`description`**, and **`archived`** (company processes only for archiving). It no longer accepts moving a process between companies via **`company_id`** or legacy **`company_template`** on PATCH—use create/duplicate flows per Hudu’s API.
+
+`POST` / `PUT` `/procedures` use a **flat** JSON body (`{"name": "...", "company_id": ...}`), not a nested `procedure` object—this matches Hudu **2.39.6+** and avoids `422` “Name can’t be blank” if the server ignored the old wrapper.
+
+Paginated **`GET /procedures`** responses are normalized to a **`HuduCollection`** even when only one row is returned (so `len()` is a row count and `for p in …` yields `Procedure` objects, not attribute names). List payloads may use **`procedures`** or **`processes`** as the collection key.
+
+`Procedure.save()` sends only those allowed fields so validation matches the spec.
+
+Use **`Procedure.add_task(...)`** to create a template task (optional **`auto_kickoff=True`** after create). Run-only fields belong on the run task after kickoff.
+
+### Users
+
+```python
+myuser.assign_task(thistask)
+myotheruser.assign_task(client.procedure_tasks.get(56))
+```
+
+You can assign a run task from a `Users` instance or call `task.assign_to(user)`; both use `assigned_users` on the run task.
+
+### Labels and label types
+
+Labels attach a **label type** to a **labelable record**. Labelable types (see `LABELABLE_TYPES` in `constants.py`) are:
+
+`Article`, `Asset`, `AssetPassword`, `Website`, `IpAddress`, `Vlan`, `VlanZone`, `Procedure`, `Network`, `RackStorage`
+
+Client entry points:
+
+```python
+client.labels          # alias: client.label
+client.label_types     # aliases: client.label_type, client.labeltypes, client.labeltype
+```
+
+See also **`examples/using_labels.py`** for a full smoke-test flow.
+
+#### Creating and modifying label types
+
+**Create** (`POST /label_types`). Required body fields: **`name`**, **`color`**, **`applicable_record_types`**. Optional: **`access_level`** (`all_companies` or `specific_companies`), **`allowed_company_ids`** (when scoped to specific companies).
+
+```python
+priority = client.label_types.create({
+    "name": "Priority",
+    "color": "#6136ff",
+    "applicable_record_types": ["Article", "Asset"],
+})
+
+# kwargs style also works
+status = client.label_types.create(
+    name="Status",
+    color="#00aa00",
+    applicable_record_types=["Article"],
+)
+```
+
+`applicable_record_types` is validated locally against `LABELABLE_TYPES` before the request is sent.
+
+**Color** values are normalized on create and update (parity with HuduAPI PowerShell `ConvertTo-HuduLabelColor`):
+
+- Hex: optional `#`, 3- or 6-digit; 8-digit `#rrggbbaa` has alpha stripped to `#rrggbb`
+- Names: English and multilingual aliases (`"light blue"`, `"grau"`, `"rouge"`, …) map to Hudu’s canonical palette
+
+```python
+from hudu_magic import convert_to_hudu_label_color
+
+convert_to_hudu_label_color("light green")   # -> "#90ee90"
+convert_to_hudu_label_color("#6136ff80")     # -> "#6136ff"
+
+client.label_types.create(name="Tag", color="orange", applicable_record_types=["Asset"])
+```
+
+**List / get:**
+
+```python
+types = client.label_types.list()
+types = client.label_types.list(name="Priority")
+one = client.label_types.get(3)
+```
+
+**Update** (`PUT /label_types/{id}`):
+
+```python
+client.label_types.update(priority.id, {"color": "#ff0000", "name": "High Priority"})
+priority.update({"color": "#ff0000"})
+```
+
+**Delete** a label type via the model (uses `DELETE /label_types/{id}`):
+
+```python
+priority.delete()
+```
+
+#### Applying, listing, and removing labels
+
+A **label** row links one label type to one record (`label_type_id`, `labelable_type`, `labelable_id`). These paths are equivalent; pick whichever reads best in your script.
+
+**From the labelable object** (recommended for single records):
+
+```python
+article.add_label(priority_type)       # alias: assign_label
+labels = article.list_labels()
+typed = article.list_labels(priority_type)
+article.strip_labels(priority_type)    # one type
+article.strip_labels()                 # all labels on this record
+```
+
+**From the label type:**
+
+```python
+priority_type.assign_to(article)
+priority_type.strip_from(article)
+```
+
+**From `LabelsResource`** (single object or `HuduCollection`):
+
+```python
+client.labels.assign(article, priority_type)
+client.labels.assign(articles, priority_type)   # HuduCollection → HuduCollection of Label
+
+client.labels.list_for(article)
+client.labels.list_for(article, label_type_id=priority_type.id)
+
+client.labels.strip(article, priority_type)
+client.labels.strip(articles)                   # batch strip
+```
+
+Aliases on `LabelsResource`: **`add_label`** = **`assign`**, **`strip_labels`** = **`strip`**.
+
+**From any `BaseResource`** (delegates to `client.labels`; useful when you already have `client.articles` in hand):
+
+```python
+client.articles.add_label(article, priority_type)
+client.articles.add_label(articles, priority_type)
+client.articles.list_labels(article, priority_type)
+client.articles.strip_labels(article)
+client.articles.strip_labels(articles, priority_type)
+```
+
+**Global label list** (filter by record or type):
+
+```python
+client.labels.list(labelable_type="Article", labelable_id=article.id)
+client.labels.list(label_type_id=priority_type.id)
+client.labels.delete(label_id)   # DELETE /labels/{id}
+```
+
+Non-labelable objects (for example `Company`) raise **`ValueError`** from **`to_labelable_ref()`** before any API call.
+
+#### `HuduCollection` batch helpers
+
+When **`list_*`** returns a **`HuduCollection`**, you can batch label operations without a manual loop.
+
+For **list** and **strip** on collections of **2+** labelable records, the client uses a batched strategy: one paginated **`GET /labels`** per distinct **`labelable_type`** (optionally filtered by **`label_type_id`**), then filters locally to your record ids — instead of one list request per object. **`types.strip_from(article)`** on 2+ label types similarly lists once on the record, then deletes matching rows. **`assign`** / **`add_label`** still require one create per record (no bulk apply in the API).
+
+If your instance has a huge number of labels for a type but you only touch a few records, targeted per-object lists can still be cheaper; tune **`LABEL_COLLECTION_BATCH_MIN`** in `constants.py` (default **2**) if needed.
+
+**Labelable object collections** (for example `company.list_articles()`):
+
+```python
+articles = company.list_articles()
+
+articles.add_label(priority_type)              # alias: assign_label
+all_labels = articles.list_labels()           # flattened across members
+articles.strip_labels(priority_type)
+articles.strip_labels()
+```
+
+**Label type collections** (for example `client.label_types.list()`):
+
+```python
+types = client.label_types.list()
+article_types = types.for_record_type("Article")
+
+types.assign_to(article)
+types.strip_from(article)
+```
+
+**Label collections** (for example `client.labels.list(...)`):
+
+```python
+labels = client.labels.list(labelable_type="Article", labelable_id=article.id)
+labels.delete_all()
+```
+
+### Others
+
+there are many other handy and helpful class methods and many more that are planned. Whenever possible, I'll update this section with specific examples.
+
+---
+
+# Creating Objects
+
+The create base method for all objects is simple. you can specify properties in either the payload object (standard dictionary) or as kwargs (just propertyname=value)
+
+This means you can use either:
+
+### kwargs (recommended)
+```python
+client.assets.create(name="Router", company_id=1, asset_layout_id=10)
+```
+
+### dict payload
+```python
+client.assets.create(payload={"name": "Router", "company_id": 1, "asset_layout_id": 10})
+```
+
+---
+
+# Updating Objects
+
+```python
+asset.name = "New Name"
+asset.save()
+```
+
+or
+
+```python
+asset.update(name="New Name")
+```
+
+---
+
+# Relations
+
+```python
+asset.relate_to(website)
+```
+
+or
+
+```python
+client.relations.create(from_obj=asset, to_obj=website)
+```
+
+---
+
+# Uploads
+
+```python
+asset.upload_to("file.zip")
+
+uploads = asset.list_uploads()
+```
+
+# Photos
+
+```python
+asset.add_photo("image.png")
+
+photos = asset.list_photos()
+```
+
+---
+
+# Labels (quick reference)
+
+| Goal | Example |
+|------|---------|
+| Create label type | `client.label_types.create({...})` |
+| Update label type | `client.label_types.update(id, {...})` |
+| Apply to one record | `record.add_label(label_type)` |
+| Apply to many records | `client.labels.assign(records, label_type)` |
+| List on one record | `record.list_labels()` |
+| Strip from one record | `record.strip_labels(label_type)` |
+| Strip from many records | `client.labels.strip(records, label_type)` |
+| Batch on a collection | `records.add_label(label_type)` |
+
+---
+
+## Generating builds for new Hudu versions or previous versions
+
+1. Place openapi spec file https://yoururl.huducloud.com/api-docs.json in project directory as hudu-openapiv1.json
+
+2. run `python generate_endpoints.py` after sourcing virtual environment (that has dev dependencies installed)
+
+3. run `./build.sh`
+
+***todo: `.\build.ps1`***
+
+this is designed to be super simple so that subsequent releases can eventually just be automatically generated, tested, validated, and pushed to pypi.
+
+#### Note on building and tests
+
+- Run tests with `./build.sh --test` (or `pytest` from a dev environment with `pip install -e ".[dev]"`).
+- Integration tests are skipped unless you set `HUDU_RUN_INTEGRATION=1`. With that set, copy `testenv.example` to `testenv` and fill in `HUDU_TEST_API_KEY` and `HUDU_TEST_INSTANCE`.
+
+---
+
+# Error Handling, Additional Info / Help
+
+
+If more information is needed, you can call this method on class members to get all associated info from hudu's API spec-
+
+`huduobject.help()`
+
+For resources such as `client.assets`, you can call:
+
+`client.assets.describe()`
+
+or for more verbose info:
+
+`client.assets.help()`
+
+if an object type or resource doesnt support a method call or payload param, you'll be notified of which one(s), if any, are invalid.
+
+### Rate limiting (Rack::Attack)
+
+All API traffic goes through `HuduClient._send_request` with retry behavior aligned to HuduAPI PowerShell **`Invoke-HuduRequest`**:
+
+- **429** / **"Retry later"** / **"Too Many Requests"** → sleep until the next **5-minute** window (plus 1–4s jitter), then retry
+- **Other errors** (except **404**) → sleep **5s**, then retry once (**only when `retry_on_error=True`**)
+- **404** → no retry (fail immediately)
+
+Defaults: **`max_retries=1`**, **`retry_on_rate_limit=True`**, **`retry_on_error=False`** (rate-limit retries only). Enable generic error retry for PowerShell-style behavior:
+
+```python
+client = HuduClient(
+    api_key="...",
+    instance_url="https://yourinstance.hudu.app",
+    max_retries=1,
+    retry_on_rate_limit=True,
+    retry_on_error=True,
+    error_retry_delay=5.0,
+    rate_limit_window_seconds=300,
+)
+```
+
+
+## Advanced Use Possibilities
+
+### Multi-Client
+
+You can instantiate two or more client objects, like above, to transfer data from, say, your dev instance to production. This hasn't been extensively tested expecially for objects dependent on companies (assets, passwordfolders)
+
+```python
+client2.assets.create(
+    **client1.assets.get(6).to_dict()
+)
+```
+
+# Philosophy
+
+- Simple > clever  
+- Explicit > implicit  
+- Thin wrapper over Hudu API  
+
+---
+
+# License
+
+MIT
+
+---
+
+# Versioning convention
+
+PyPI releases use a **library** SemVer prefix and a numeric suffix derived from the **Hudu OpenAPI spec** used to generate `HuduEndpoint` and related code:
+
+`MAJOR.MINOR.HUDUSPECVERSION`
+
+- **`MAJOR` / `MINOR`** — reserved for this Python package (breaking API changes, larger feature sets, and so on).
+- **`HUDUSPECVERSION`** — encodes the spec’s `(major, minor, patch)` as a single integer:
+
+  `hudu_spec_major * 1000 + hudu_spec_minor * 10 + hudu_spec_patch`
+
+  Example: OpenAPI **2.41.0** → `2 * 1000 + 41 * 10 + 0` = **2410** → package segment **0.1.2410** (with `0.1` as the current library prefix).
+
+When Hudu publishes a new spec, regenerate and bump **`HUDUSPECVERSION`** accordingly. For **Python-only** fixes (same spec, no regeneration), prefer a **PEP 440** suffix such as `0.1.2410.post1` so the encoded spec stays honest.
+
+**Spec used for the current release:** Hudu OpenAPI **2.44.1**. The canonical package version is in `pyproject.toml`.
+
+# History
+
+- v0.1.2410 - Apr 6, 2026; Initial Release
+
+- v0.2.2410 - Apr 7, 2026; added validation, differentiation for procedure-vs-run and task-vs-runtask, as well as some helpful class methods.
+
+- v0.3.2410 - Apr 21, 2026; Procedures `POST`/`PUT` send a **flat** JSON body (no `procedure` wrapper), Paginated lists always return **`HuduCollection`** (removed previous single-page `len`/iteration quirks); accept **`processes`** list key on GET; add **`Procedure.add_task`**. README Re-aligned with process/run task rules; `Procedure.save`/`update`/`delete` use `PROCEDURES_ID` and allowed PATCH fields; `PROCEDURE_TASK_RUN_ONLY_FIELDS` no longer lists removed `user_id` update key. **`BaseResource.create` / `update`**: optional `payload` (kwargs-only body fields supported); `validate` / `allow_unknown_fields` are not merged into JSON.
+
+- v0.4.2410.post1 - Added better support for exports, aliased create methods for exports to `new()` and `start()`. Added kind defaults to these and extended resource from `BaseFileResource` to allow for downloading. Lastly, added blocking method that until an export is ready for download. [PEP440 suffix noted for tag adjustment.]
+
+- v0.4.2411 - Generated Endpoints.py from new 2.41.1 spec, which is actually no different than previous release. For consistency and clarity, pushing new release tag, Fri, April 24th, 2026
+
+- v0.4.2412 - Generated Endpoints.py from 2.41.2 spec, Tues, April 28, 2026
+
+- v0.5.2412 - Including some internally-developed helpers / sane defaults for asset layouts and fields. Such helpers facilitate creating new layouts or moving layouts (and objects referenced by fields) more easily.
+`FIELD_TYPES`, `ASSET_LAYOUT_FIELD_READ_ONLY_KEYS`, 
+`ASSET_LAYOUT_POST_BODY_KEYS` are for validation. 
+`normalize_layout_for_create` facilitates isomorphism for entire layouts (as huduobject-layout or layout from dictionary). Furthermore, added some very basic and specific field validation for website fields and number fields, specifically.
+
+- v0.5.2420 - Generated Endpoints.py from 2.42.0 spec, Thurs, May 14, 2026
+
+- v0.5.2421 - Generated Endpoints.py from 2.42.1 hotfix, Thurs, May 20, 2026
+
+- v0.5.2430 - Generated Endpoints.py from 2.43.0 definitions, Wed, May 27, 2026
+
+- v0.5.2431 - Generated Endpoints.py from 2.43.1 definitions, Version incremented for clarity and consistency Mon, Jun 1, 2026
+
+- v0.5.2432 - Generated Endpoints.py from 2.43.2 definitions, Version incremented for clarity and consistency Mon, Jun 15, 2026
+
+- v0.6.2440 - Generated Endpoints from Hudu OpenAPI **2.44.0**; **`LabelsResource`** / **`LabelTypesResource`**; label helpers on **`HuduObject`**, **`BaseResource`**, and **`HuduCollection`** (`add_label`, `list_labels`, `strip_labels`, `assign_to`, `strip_from`, `for_record_type`, `delete_all`); client aliases `label`, `label_type`, `labeltypes`; see **Labels and label types** above and **`examples/using_labels.py`**. This has not been released (beta-spec) to maintain version-parity with Mainline Hudu.
+
+- v0.7.2440 - Ensuring Rack-Attack-Standard ratelimiting procedure, introduced with http helper that waits until next 5m window if exceeded.
+
+- v0.8.2441 - Regenerated Endpoints from Hudu OpenAPI **2.44.1**. Spec delta is **Relations-only** (not labels):
+  - **`GET /relations`** query filters: `fromable_type`, `fromable_id`, `toable_type`, `toable_id`, `is_inverse`, `description`, `created_at`, `updated_at` (plus pagination).
+  - **`POST /relations`** create body now documents required fields (`fromable_type`, `fromable_id`, `toable_type`, `toable_id`) and enums that include IPAM/network types (`Network`, `IpAddress`, `Vlan`, `VlanZone`, `RackStorage`) alongside Asset/Company/Article/etc.
+  - Operation IDs renamed (`create_relation`, `delete_relation`) — cosmetic for this client.
+  - `FROMABLE_TOABLE_TYPES` / `RelationsResource.create` / `relate_to` already matched. **`list_relations`** now uses the new server-side `fromable_*` / `toable_*` filters (two targeted GETs + dedupe) instead of listing all relations then filtering client-side.
+
+- v0.8.2442 - Regenerated Endpoints from Hudu OpenAPI **2.44.2** [no change to api spec].
+
+- v0.8.2442 - Regenerated Endpoints from Hudu OpenAPI **2.44.3** [no change to api spec].
+
+---
+
+## Community & Socials
+
+[![Hudu Community](https://img.shields.io/badge/Community-Forum-blue?logo=discourse)](https://community.hudu.com/)
+[![Reddit](https://img.shields.io/badge/Reddit-r%2Fhudu-FF4500?logo=reddit)](https://www.reddit.com/r/hudu)
+[![YouTube](https://img.shields.io/badge/YouTube-Hudu-red?logo=youtube)](https://www.youtube.com/@hudu1715)
+[![X (Twitter)](https://img.shields.io/badge/X-@HuduHQ-black?logo=x)](https://x.com/HuduHQ)
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-Hudu_Technologies-0A66C2?logo=linkedin)](https://www.linkedin.com/company/hudu-technologies/)
+[![Facebook](https://img.shields.io/badge/Facebook-HuduHQ-1877F2?logo=facebook)](https://www.facebook.com/HuduHQ/)
+[![Instagram](https://img.shields.io/badge/Instagram-@huduhq-E4405F?logo=instagram)](https://www.instagram.com/huduhq/)
+[![Feature Requests](https://img.shields.io/badge/Feedback-Feature_Requests-brightgreen?logo=github)](https://hudu.canny.io/)
