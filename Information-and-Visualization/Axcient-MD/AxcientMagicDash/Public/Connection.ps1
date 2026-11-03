@@ -348,7 +348,7 @@ function Get-AmdAxcientClientUsage {
         -Uri "https://axapi.axcient.com/x360recover/client/$ClientId/usage" `
         -Method Get `
         -Headers @{ 'X-API-Key' = $keyInfo.Value; Accept = 'application/json' } `
-        -UserAgent 'AXCIENT-MAGIC-DASH/2.4.0' `
+        -UserAgent 'AXCIENT-MAGIC-DASH/2.5.0' `
         -TimeoutSec $TimeoutSec `
         -MaximumRedirection 0 `
         -SkipHttpErrorCheck `

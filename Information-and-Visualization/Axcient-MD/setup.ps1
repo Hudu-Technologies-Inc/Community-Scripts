@@ -299,60 +299,6 @@ function Invoke-AmdUnownedLegacyMagicDashCleanup {
     return $deleted
 }
 
-function Connect-AmdExistingAssetLayoutInteractive {
-    [CmdletBinding()]
-    param([Parameter(Mandatory)]$Config)
-
-    $layouts = @(Get-AmdHuduAssetLayout -ErrorAction Stop | Sort-Object name, id)
-    if ($layouts.Count -eq 0) {
-        Write-Host 'Hudu has no existing asset layouts available to connect.' -ForegroundColor Yellow
-        return $false
-    }
-    Write-Host "`nExisting Hudu asset layouts" -ForegroundColor Magenta
-    $displayLimit = 50
-    foreach ($layout in @($layouts | Select-Object -First $displayLimit)) {
-        Write-Host "  ID $($layout.id): $([string]$layout.name)" -ForegroundColor Yellow
-    }
-    if ($layouts.Count -gt $displayLimit) {
-        Write-Host "  ...and $($layouts.Count - $displayLimit) more. Enter a Hudu layout ID from the full Asset Layouts page if it is not shown here." -ForegroundColor Yellow
-    }
-
-    while ($true) {
-        $raw = (Read-AmdConfirmedInput -Prompt 'Enter the Hudu asset layout ID to connect, or Q to cancel').Trim()
-        if ($raw -eq 'Q') { return $false }
-        $selectedId = 0L
-        if (-not [int64]::TryParse(
-                $raw,
-                [Globalization.NumberStyles]::None,
-                [Globalization.CultureInfo]::InvariantCulture,
-                [ref]$selectedId
-            ) -or $selectedId -lt 1) {
-            Write-Host 'Enter a positive Hudu asset layout ID, or Q.' -ForegroundColor Red
-            continue
-        }
-        $listed = @($layouts | Where-Object { [int64]$_.id -eq $selectedId })
-        if ($listed.Count -ne 1) {
-            Write-Host 'That ID was not returned by Hudu. Refresh Hudu Asset Layouts and choose one of its current IDs.' -ForegroundColor Red
-            continue
-        }
-        try {
-            Add-AmdHuduAssetLayoutDetailsField -Id $selectedId -Confirm:$false -ErrorAction Stop | Out-Null
-            $verified = Get-AmdHuduAssetLayout -Id $selectedId -ErrorAction Stop
-            if (-not (& (Get-Module AxcientMagicDash) { param($Layout) Test-AmdAssetLayoutIsReady -Layout $Layout } $verified)) {
-                throw 'Hudu did not return an active layout with a RichText Asset Details field after the connection update.'
-            }
-            $Config.assetLayoutId = $selectedId
-            $Config.assetLayoutName = [string]$verified.name
-            Write-Host "Connected Hudu asset layout '$($Config.assetLayoutName)' (ID $selectedId). Existing customer fields and settings were preserved." -ForegroundColor Green
-            return $true
-        }
-        catch {
-            Write-Host "That layout could not be connected safely. $(Get-AmdSafeErrorText $_)" -ForegroundColor Red
-            Write-Host 'Choose a different layout, or enter Q to leave device assets disconnected.' -ForegroundColor Yellow
-        }
-    }
-}
-
 function Resolve-AmdInteractiveAssetLayoutHealth {
     [CmdletBinding()]
     param(
@@ -399,7 +345,7 @@ function Resolve-AmdInteractiveAssetLayoutHealth {
             return [pscustomobject]@{ Status = 'Missing'; Layout = $null; Changed = $false }
         }
         if ($choice -eq '2') {
-            $changed = Connect-AmdExistingAssetLayoutInteractive -Config $Config
+            $changed = Connect-AmdExistingAssetLayoutInteractive -Config $Config -ReadInput $readOptionalInput
             $connected = if ($changed) { Get-AmdHuduAssetLayout -Id ([int64]$Config.assetLayoutId) -ErrorAction Stop } else { $null }
             $recoveryStatus = if ($changed) { 'Healthy' } else { 'Missing' }
             return [pscustomobject]@{ Status = $recoveryStatus; Layout = $connected; Changed = [bool]$changed }
@@ -906,7 +852,7 @@ if (-not (Test-Path -LiteralPath $configPath)) {
         param($Prompt, $Default)
         Read-YesNo -Prompt $Prompt -Default $Default
     } | Out-Null
-    $config = Complete-AmdAssetLayoutBinding -Config $config -ReadInput $readOptionalInput
+    $config = Select-AmdAssetLayoutBinding -Config $config -ReadInput $readOptionalInput
     Set-DestinationSettings -Config $config
     Write-Host "`nExact-name automatch connects otherwise-unmatched clients only when one Hudu company has the same name. Explicitly deleted pairs stay excluded." -ForegroundColor Yellow
     $config.autoMatch = Read-YesNo 'Enable exact-name automatch on future runs?' $true
@@ -1195,7 +1141,7 @@ What would you like to do?
                     param($Prompt, $Default)
                     Read-YesNo -Prompt $Prompt -Default $Default
                 } | Out-Null
-                $config = Complete-AmdAssetLayoutBinding -Config $config -ReadInput $readOptionalInput
+                $config = Select-AmdAssetLayoutBinding -Config $config -ReadInput $readOptionalInput
             }
             elseif ($layoutHealth.Status -eq 'NeedsRepair') {
                 Add-AmdHuduAssetLayoutDetailsField -Id ([int64]$config.assetLayoutId) -Confirm:$false -ErrorAction Stop | Out-Null

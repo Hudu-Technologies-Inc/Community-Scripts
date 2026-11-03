@@ -186,6 +186,8 @@ function New-AmdMatchRows {
             MatchedDisplay = if ($isStale) { '✕ Stale match' } else { '✓ Matched' }
             MatchColor     = if ($isStale) { '#E0A44F' } else { '#3FB27F' }
             Connection     = if ($isStale) { 'Missing endpoint — review this match' } else { "$huduName ↔ $axcientName" }
+            IsPending     = $false
+            PendingDisplay = ''
         })
     }
 
@@ -206,6 +208,8 @@ function New-AmdMatchRows {
             MatchedDisplay = '✕ Not matched'
             MatchColor     = '#E5544B'
             Connection     = 'Not connected'
+            IsPending     = $false
+            PendingDisplay = ''
         })
     }
 
@@ -226,32 +230,165 @@ function New-AmdMatchRows {
             MatchedDisplay = '✕ Not matched'
             MatchColor     = '#E5544B'
             Connection     = 'Not connected'
+            IsPending     = $false
+            PendingDisplay = ''
         })
     }
 
     return @($rows)
 }
 
-function Get-AmdMatchingSelectionState {
+function New-AmdMatchingPendingSelection {
+    <#
+        .SYNOPSIS
+        An empty click-to-match staging area.
+
+        .DESCRIPTION
+        Matching used to rely on modifier-key multi-select, which operators
+        consistently got wrong: a plain second click silently replaced the
+        first selection, so "Manually match selected" stayed disabled and the
+        only clue was a greyed-out button.
+
+        The pending selection replaces that. One left-click stages a row, a
+        second left-click on the other side completes the pair, and the button
+        enables. No modifier keys.
+
+        HuduRow and AxcientRow are the two halves of a prospective match.
+        MatchedRow is an existing match selected for unmatching. The two are
+        mutually exclusive - you are either building a pair or acting on one.
+    #>
     [CmdletBinding()]
-    param([AllowNull()][object[]]$SelectedRows = @())
+    param()
+    return [pscustomobject]@{ HuduRow = $null; AxcientRow = $null; MatchedRow = $null }
+}
 
-    $selected = @($SelectedRows)
-    $huduOnlyCount = @($selected | Where-Object Kind -eq 'HuduOnly').Count
-    $axcientOnlyCount = @($selected | Where-Object Kind -eq 'AxcientOnly').Count
-    $matchedCount = @($selected | Where-Object Kind -in 'Matched', 'Stale').Count
+function Test-AmdMatchingSameRow {
+    <#
+        Whether two row objects are the same row.
 
-    return [pscustomobject]@{
-        CanManualMatch = $selected.Count -eq 2 -and $huduOnlyCount -eq 1 -and $axcientOnlyCount -eq 1
-        CanUnmatch     = $selected.Count -eq 1 -and $matchedCount -eq 1
+        Compared by Kind plus BOTH ids rather than by reference, because the
+        grid rebuilds its rows on every refresh: a reference comparison would
+        quietly stop recognising the staged row the moment anything else
+        changed, and the toggle would turn into "stage it again".
+    #>
+    [CmdletBinding()]
+    param([AllowNull()]$First, [AllowNull()]$Second)
+
+    if ($null -eq $First -or $null -eq $Second) { return $false }
+    if ([string]$First.Kind -ne [string]$Second.Kind) { return $false }
+    return ([string]$First.HuduId -eq [string]$Second.HuduId) -and
+           ([string]$First.AxcientId -eq [string]$Second.AxcientId)
+}
+
+function Update-AmdMatchingPendingSelection {
+    <#
+        .SYNOPSIS
+        The click-to-match state machine. No WPF, so it is directly testable.
+
+        .DESCRIPTION
+        One left-click, one transition:
+
+            HuduOnly      stages (or unstages) the Hudu half, drops any
+                          selected match
+            AxcientOnly   stages (or unstages) the Axcient half, drops any
+                          selected match
+            Matched/Stale selects (or deselects) that match for unmatching,
+                          and clears both halves of any part-built pair
+
+        Clicking a DIFFERENT row on a side that is already staged REPLACES
+        that side - the operator changed their mind about which company, and
+        making them click twice to clear it first would be worse than useless.
+        Clicking the SAME row again unstages it, which is the only way back to
+        an empty selection without completing the match.
+
+        Mutating and returning the same object keeps the caller's reference
+        valid; the WPF handler holds exactly one of these for the window's
+        lifetime.
+    #>
+    [CmdletBinding()]
+    param([AllowNull()]$Pending, [AllowNull()]$ClickedRow)
+
+    if ($null -eq $Pending) { $Pending = New-AmdMatchingPendingSelection }
+    # A click that lands on the header, the scrollbar or empty space below the
+    # rows must not disturb a half-built pair.
+    if ($null -eq $ClickedRow) { return $Pending }
+
+    switch ([string]$ClickedRow.Kind) {
+        'HuduOnly' {
+            $Pending.MatchedRow = $null
+            if (Test-AmdMatchingSameRow -First $Pending.HuduRow -Second $ClickedRow) { $Pending.HuduRow = $null }
+            else { $Pending.HuduRow = $ClickedRow }
+        }
+        'AxcientOnly' {
+            $Pending.MatchedRow = $null
+            if (Test-AmdMatchingSameRow -First $Pending.AxcientRow -Second $ClickedRow) { $Pending.AxcientRow = $null }
+            else { $Pending.AxcientRow = $ClickedRow }
+        }
+        default {
+            # Matched and Stale both land here. Selecting an existing match is
+            # a different intent from building a new one, so the part-built
+            # pair goes - otherwise "Manually match" and "Unmatch" could both
+            # be enabled and the window would be lying about what will happen.
+            $Pending.HuduRow = $null
+            $Pending.AxcientRow = $null
+            if (Test-AmdMatchingSameRow -First $Pending.MatchedRow -Second $ClickedRow) { $Pending.MatchedRow = $null }
+            else { $Pending.MatchedRow = $ClickedRow }
+        }
+    }
+
+    return $Pending
+}
+
+function Update-AmdMatchRowPendingFlag {
+    <#
+        Stamps IsPending/PendingDisplay onto the rows so the grid can show
+        what is staged.
+
+        New-AmdMatchRows cannot do this itself - it builds the rows before
+        anything has been clicked - so the flags are refreshed here on every
+        transition. Returns nothing; the row objects are mutated in place and
+        the caller calls Items.Refresh().
+    #>
+    [CmdletBinding()]
+    param([AllowNull()][object[]]$Rows = @(), [AllowNull()]$Pending)
+
+    foreach ($row in @($Rows)) {
+        if ($null -eq $row) { continue }
+        $isPending = $false
+        $display = ''
+        if ($null -ne $Pending) {
+            if (Test-AmdMatchingSameRow -First $Pending.HuduRow -Second $row) { $isPending = $true; $display = '● Hudu' }
+            elseif (Test-AmdMatchingSameRow -First $Pending.AxcientRow -Second $row) { $isPending = $true; $display = '● Axcient' }
+            elseif (Test-AmdMatchingSameRow -First $Pending.MatchedRow -Second $row) { $isPending = $true; $display = '● Selected' }
+        }
+        $row.IsPending = $isPending
+        $row.PendingDisplay = $display
     }
 }
 
+function Get-AmdMatchingSelectionState {
+    <#
+        What the two action buttons should be doing.
+
+        Takes the pending selection rather than the grid's SelectedItems: with
+        SelectionMode="Single" the grid can only ever report one row, so the
+        old "exactly two selected, one from each side" test could never be
+        true again.
+    #>
+    [CmdletBinding()]
+    param([AllowNull()]$Pending)
+
+    return [pscustomobject]@{
+        CanManualMatch = ($null -ne $Pending -and $null -ne $Pending.HuduRow -and $null -ne $Pending.AxcientRow)
+        CanUnmatch     = ($null -ne $Pending -and $null -ne $Pending.MatchedRow)
+    }
+}
 function Show-AmdUnmatchDialog {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)]$MatchRow,
-        [Parameter(Mandatory)][AllowEmptyCollection()][object[]]$AvailableHuduCompanies
+        [Parameter(Mandatory)][AllowEmptyCollection()][object[]]$AvailableHuduCompanies,
+        [AllowNull()][scriptblock]$AfterWindowLoaded
     )
 
     [xml]$xaml = @'
@@ -260,6 +397,29 @@ function Show-AmdUnmatchDialog {
         Title="Unmatch company" Width="610" Height="390" WindowStartupLocation="CenterScreen"
         ResizeMode="NoResize" Background="#0E1017" Foreground="#F4F6FB" FontFamily="Segoe UI">
   <Window.Resources>
+    <SolidColorBrush x:Key="{x:Static SystemColors.WindowBrushKey}" Color="#12151D"/>
+    <SolidColorBrush x:Key="{x:Static SystemColors.WindowTextBrushKey}" Color="#F4F6FB"/>
+    <SolidColorBrush x:Key="{x:Static SystemColors.ControlBrushKey}" Color="#12151D"/>
+    <SolidColorBrush x:Key="{x:Static SystemColors.ControlTextBrushKey}" Color="#F4F6FB"/>
+    <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="#3D5A80"/>
+    <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightBrushKey}" Color="#2A3548"/>
+    <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightTextBrushKey}" Color="#F4F6FB"/>
+    <Style x:Key="AmdUnmatchComboItemStyle" TargetType="ComboBoxItem">
+      <Setter Property="Background" Value="#1C2029"/>
+      <Setter Property="Foreground" Value="#F4F6FB"/>
+      <Setter Property="Padding" Value="8,6"/>
+      <Style.Triggers>
+        <Trigger Property="IsHighlighted" Value="True">
+          <Setter Property="Background" Value="#3D5A80"/>
+          <Setter Property="Foreground" Value="#FFFFFF"/>
+        </Trigger>
+        <Trigger Property="IsSelected" Value="True">
+          <Setter Property="Background" Value="#2F4A6D"/>
+          <Setter Property="Foreground" Value="#FFFFFF"/>
+        </Trigger>
+      </Style.Triggers>
+    </Style>
     <Style TargetType="Button">
       <Setter Property="Foreground" Value="White"/><Setter Property="Background" Value="#6136FF"/>
       <Setter Property="Padding" Value="16,9"/><Setter Property="Margin" Value="5"/>
@@ -280,13 +440,10 @@ function Show-AmdUnmatchDialog {
       </Setter>
     </Style>
     <Style TargetType="ComboBox">
-      <Setter Property="Margin" Value="5"/><Setter Property="Padding" Value="8"/>
+      <Setter Property="Margin" Value="5"/><Setter Property="Padding" Value="8,6"/>
       <Setter Property="Background" Value="#12151D"/><Setter Property="Foreground" Value="#F4F6FB"/>
       <Setter Property="BorderBrush" Value="#3A4152"/>
-    </Style>
-    <Style TargetType="ComboBoxItem">
-      <Setter Property="Background" Value="#1C2029"/><Setter Property="Foreground" Value="#F4F6FB"/>
-      <Setter Property="Padding" Value="8"/>
+      <Setter Property="ItemContainerStyle" Value="{StaticResource AmdUnmatchComboItemStyle}"/>
     </Style>
   </Window.Resources>
   <Grid Margin="22">
@@ -342,6 +499,24 @@ function Show-AmdUnmatchDialog {
         $window.Close()
     })
     $window.FindName('CancelButton').Add_Click({ $window.Close() })
+
+    if ($null -ne $AfterWindowLoaded) {
+        $automationGate = [object[]]@(,$false)
+        $window.Add_Loaded({
+            if ($automationGate[0]) { return }
+            $automationGate[0] = $true
+            $null = $window.Dispatcher.BeginInvoke(
+                [Windows.Threading.DispatcherPriority]::ApplicationIdle,
+                [action]{
+                    & $AfterWindowLoaded @{
+                        Window = $window
+                        Combo  = $target
+                    }
+                }
+            )
+        })
+    }
+
     $null = $window.ShowDialog()
     return $result
 }
@@ -352,7 +527,11 @@ function Show-AmdMatchingWindow {
         [AllowNull()][object[]]$HuduCompanies = @(),
         [AllowNull()][object[]]$AxcientClients = @(),
         [Alias('Matches')]
-        [AllowNull()][object[]]$ExistingMatches = @()
+        [AllowNull()][object[]]$ExistingMatches = @(),
+        # Optional hook for scripts/Invoke-LiveMatchingUiTest.ps1: runs once after the
+        # grid is first rendered so QA can raise the same PreviewMouseLeftButtonDown
+        # path the operator uses, then close with Cancel.
+        [AllowNull()][scriptblock]$AfterWindowLoaded
     )
 
     if (-not $IsWindows) {
@@ -418,10 +597,21 @@ function Show-AmdMatchingWindow {
     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
     <TextBlock Text="Company matching" FontSize="26" FontWeight="SemiBold"/>
     <TextBlock Grid.Row="1" Margin="0,6,0,14" Foreground="#A3AABD" TextWrapping="Wrap"
-               Text="Green exact-name matches are already staged—click OK to save them and run the sync. To create a different manual match, Ctrl+click one Hudu-only row and one Axcient-only row. To change a saved match later, select it and click Unmatch. IDs keep duplicate names unambiguous."/>
+               Text="Green exact-name matches are already staged—click OK to save them and run the sync. To create a different manual match, click one Hudu row, then click one Axcient row, then click Manually match selected. To change a saved match later, click it and click Unmatch. IDs keep duplicate names unambiguous."/>
     <DataGrid x:Name="MatchGrid" Grid.Row="2" AutoGenerateColumns="False" IsReadOnly="True"
-              SelectionMode="Extended" SelectionUnit="FullRow" AlternationCount="2">
+              SelectionMode="Single" SelectionUnit="FullRow" AlternationCount="2">
+      <DataGrid.RowStyle>
+        <Style TargetType="DataGridRow">
+          <Style.Triggers>
+            <DataTrigger Binding="{Binding IsPending}" Value="True">
+              <Setter Property="Background" Value="#2F4A6D"/>
+              <Setter Property="FontWeight" Value="SemiBold"/>
+            </DataTrigger>
+          </Style.Triggers>
+        </Style>
+      </DataGrid.RowStyle>
       <DataGrid.Columns>
+        <DataGridTextColumn Header="Selected" Binding="{Binding PendingDisplay}" Width="0.5*"/>
         <DataGridTextColumn Header="Hudu company / ID" Binding="{Binding HuduDisplay}" Width="1.15*"/>
         <DataGridTextColumn Header="Axcient client / ID" Binding="{Binding AxcientDisplay}" Width="1.15*"/>
         <DataGridTemplateColumn Header="Matched" Width="0.65*">
@@ -458,14 +648,25 @@ function Show-AmdMatchingWindow {
     $operations = [System.Collections.Generic.List[object]]::new()
     $dialogState = [pscustomobject]@{ Accepted = $false }
 
+    # One pending selection for the window's lifetime. The state machine
+    # mutates it in place, so every closure below sees the same object.
+    $pending = New-AmdMatchingPendingSelection
+
     $updateButtonState = {
-        $selectionState = Get-AmdMatchingSelectionState -SelectedRows @($grid.SelectedItems)
+        $selectionState = Get-AmdMatchingSelectionState -Pending $pending
         $matchButton.IsEnabled = $selectionState.CanManualMatch
         $unmatchButton.IsEnabled = $selectionState.CanUnmatch
     }
 
     $refresh = {
+        # A match or unmatch has just been applied, so whatever was staged has
+        # been consumed. Clearing the PROPERTIES rather than reassigning keeps
+        # every closure pointed at the same object.
+        $pending.HuduRow = $null
+        $pending.AxcientRow = $null
+        $pending.MatchedRow = $null
         $rows = @(New-AmdMatchRows -HuduCompanies $HuduCompanies -AxcientClients $AxcientClients -ExistingMatches @($workingMatches))
+        Update-AmdMatchRowPendingFlag -Rows $rows -Pending $pending
         $grid.ItemsSource = $rows
         $staleCount = @($rows | Where-Object Kind -eq 'Stale').Count
         $matchedCount = @($rows | Where-Object Kind -eq 'Matched').Count
@@ -473,14 +674,38 @@ function Show-AmdMatchingWindow {
         & $updateButtonState
     }
 
-    $grid.Add_SelectionChanged({ & $updateButtonState })
+    # Left-click IS the gesture now. PreviewMouseLeftButtonDown fires before
+    # the DataGrid does its own selection work, so the visual tree is walked
+    # up from whatever was hit to find the owning row; a click on the header,
+    # a scrollbar or the empty space below the last row finds nothing and is
+    # deliberately left alone for the grid to handle normally.
+    $grid.Add_PreviewMouseLeftButtonDown({
+        # WPF hands this scriptblock (sender, RoutedEventArgs). They are taken
+        # from $args rather than a param block on purpose: naming them trips
+        # PSAvoidAssignmentToAutomaticVariable on $eventArgs and
+        # PSReviewUnusedParameter on the unused sender, and a clean analyzer
+        # run is a release gate for this project.
+        $clickArgs = $args[1]
+        $element = $clickArgs.OriginalSource -as [System.Windows.DependencyObject]
+        while ($null -ne $element -and $element -isnot [System.Windows.Controls.DataGridRow]) {
+            $element = [System.Windows.Media.VisualTreeHelper]::GetParent($element)
+        }
+        if ($null -eq $element) { return }
+        $null = Update-AmdMatchingPendingSelection -Pending $pending -ClickedRow $element.Item
+        Update-AmdMatchRowPendingFlag -Rows @($grid.ItemsSource) -Pending $pending
+        $grid.Items.Refresh()
+        & $updateButtonState
+        # Handled, so the grid does not also apply its own selection on top of
+        # the staging highlight - two different "selected" states on one row
+        # is exactly the confusion this change exists to remove.
+        $clickArgs.Handled = $true
+    })
 
     $window.FindName('MatchButton').Add_Click({
-        $selected = @($grid.SelectedItems)
-        $huduRows = @($selected | Where-Object Kind -eq 'HuduOnly')
-        $axcientRows = @($selected | Where-Object Kind -eq 'AxcientOnly')
-        if ($selected.Count -ne 2 -or $huduRows.Count -ne 1 -or $axcientRows.Count -ne 1) {
-            [System.Windows.MessageBox]::Show('Select exactly one Hudu-only row and one Axcient-only row. Hold Ctrl while selecting the second row.', 'Select one from each side', 'OK', 'Warning') | Out-Null
+        $huduRows = @($pending.HuduRow | Where-Object { $null -ne $_ })
+        $axcientRows = @($pending.AxcientRow | Where-Object { $null -ne $_ })
+        if ($huduRows.Count -ne 1 -or $axcientRows.Count -ne 1) {
+            [System.Windows.MessageBox]::Show('Click one Hudu-only row and one Axcient-only row, then click Manually match selected.', 'Select one from each side', 'OK', 'Warning') | Out-Null
             return
         }
         $queuedForCompany = @($operations | Where-Object { [int64]$_.SourceHuduId -eq [int64]$huduRows[0].HuduId })
@@ -506,12 +731,11 @@ function Show-AmdMatchingWindow {
     })
 
     $window.FindName('UnmatchButton').Add_Click({
-        $selected = @($grid.SelectedItems)
-        if ($selected.Count -ne 1 -or $selected[0].Kind -notin 'Matched', 'Stale') {
-            [System.Windows.MessageBox]::Show('Select exactly one matched or stale row to unmatch.', 'Select one match', 'OK', 'Warning') | Out-Null
+        $row = $pending.MatchedRow
+        if ($null -eq $row -or [string]$row.Kind -notin 'Matched', 'Stale') {
+            [System.Windows.MessageBox]::Show('Click exactly one matched or stale row to unmatch.', 'Select one match', 'OK', 'Warning') | Out-Null
             return
         }
-        $row = $selected[0]
         if (@($operations | Where-Object { [int64]$_.AxcientId -eq [int64]$row.AxcientId }).Count -gt 0) {
             [System.Windows.MessageBox]::Show('This Axcient client already has a queued move/delete operation in this session. Click Cancel and reopen matching if you need to choose a different operation.', 'One queued operation per client', 'OK', 'Warning') | Out-Null
             return
@@ -587,6 +811,29 @@ function Show-AmdMatchingWindow {
     })
 
     & $refresh
+
+    if ($null -ne $AfterWindowLoaded) {
+        $automationGate = [object[]]@(,$false)
+        $window.Add_Loaded({
+            if ($automationGate[0]) { return }
+            $automationGate[0] = $true
+            $null = $window.Dispatcher.BeginInvoke(
+                [Windows.Threading.DispatcherPriority]::ApplicationIdle,
+                [action]{
+                    & $AfterWindowLoaded @{
+                        Window        = $window
+                        Grid          = $grid
+                        MatchButton   = $matchButton
+                        UnmatchButton = $unmatchButton
+                        StatusText    = $status
+                        Pending       = $pending
+                        Refresh       = $refresh
+                    }
+                }
+            )
+        })
+    }
+
     $null = $window.ShowDialog()
     return [pscustomobject]@{
         Cancelled  = -not $dialogState.Accepted

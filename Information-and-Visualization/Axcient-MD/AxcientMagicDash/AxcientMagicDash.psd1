@@ -1,6 +1,6 @@
 @{
     RootModule        = 'AxcientMagicDash.psm1'
-    ModuleVersion     = '2.4.0'
+    ModuleVersion     = '2.5.0'
     GUID              = 'b86a431a-291b-4c14-a03a-25a7c0d756c8'
     Author            = 'Hudu Technologies, Inc.'
     CompanyName       = 'Hudu Technologies, Inc.'
@@ -16,6 +16,8 @@
         'ConvertTo-NormalizedHuduUrl',
         'ConvertTo-AmdRedactedText',
         'Complete-AmdAssetLayoutBinding',
+        'Connect-AmdExistingAssetLayoutInteractive',
+        'Select-AmdAssetLayoutBinding',
         'Complete-AmdSetupScheduleFinalization',
         'Enter-AmdProjectLock',
         'Exit-AmdProjectLock',
@@ -53,6 +55,7 @@
         'Set-AmdHuduMagicDash',
         'Set-AmdHuduMagicDashForCompany',
         'Show-AmdMatchingWindow',
+        'Show-AmdUnmatchDialog',
         'Show-AmdSyncSummary',
         'Sync-AmdScheduleState',
         'Test-AmdAxcientConnection',
