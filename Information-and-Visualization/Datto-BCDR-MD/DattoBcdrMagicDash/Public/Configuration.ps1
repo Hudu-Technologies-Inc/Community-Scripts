@@ -671,6 +671,148 @@ function Complete-DbmAssetLayoutBinding {
     }
 }
 
+function Connect-DbmExistingAssetLayoutInteractive {
+    <#
+        .SYNOPSIS
+        Binds an asset layout that already exists in Hudu.
+
+        .DESCRIPTION
+        Lives in the module rather than setup.ps1 so that all three entry
+        points - first-time setup, run-menu option 9, and the missing-layout
+        recovery - share one implementation, and so that it can be tested
+        without a console: $ReadInput is injected the same way
+        Complete-DbmAssetLayoutBinding takes it.
+
+        The layout does not have to be one of ours. Hudu's
+        asset_layouts.connect_existing adds the RichText "Asset Details" field
+        if it is missing and leaves every other field alone, so an operator
+        can point this at the layout they already keep their devices in.
+
+        What makes that safe is ownership marking, not the layout: the sync
+        and archive paths only touch assets whose Asset Details HTML carries
+        the ownership marker, so pre-existing customer assets in a connected
+        layout are never modified or archived.
+
+        Returns $true when the config was bound, $false when the operator
+        cancelled or Hudu had nothing to offer. The config is left untouched
+        on every failure path.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]$Config,
+        [Parameter(Mandatory)][scriptblock]$ReadInput
+    )
+
+    $layouts = @(Get-DbmHuduAssetLayout -ErrorAction Stop | Sort-Object name, id)
+    if ($layouts.Count -eq 0) {
+        Write-Host 'Hudu has no existing asset layouts available to connect.' -ForegroundColor Yellow
+        return $false
+    }
+
+    Write-Host "`nExisting Hudu asset layouts" -ForegroundColor Magenta
+    $displayLimit = 50
+    foreach ($layout in @($layouts | Select-Object -First $displayLimit)) {
+        # Flagging the ones that are already compatible saves the operator a
+        # round trip: those bind without Hudu being written to at all.
+        $suffix = ''
+        if (Test-DbmAssetLayoutIsReady -Layout $layout) { $suffix = '   (already has an Asset Details field)' }
+        Write-Host "  ID $($layout.id): $([string]$layout.name)$suffix" -ForegroundColor Yellow
+    }
+    if ($layouts.Count -gt $displayLimit) {
+        Write-Host "  ...and $($layouts.Count - $displayLimit) more. Enter a Hudu layout ID from the full Asset Layouts page if it is not shown here." -ForegroundColor Yellow
+    }
+
+    while ($true) {
+        $raw = [string](& $ReadInput 'Enter the Hudu asset layout ID to connect, or Q to cancel')
+        $answer = if ($null -eq $raw) { '' } else { $raw.Trim() }
+        if ($answer -eq 'Q' -or $answer -eq 'q') { return $false }
+
+        $selectedId = 0L
+        if (-not [int64]::TryParse(
+                $answer,
+                [Globalization.NumberStyles]::None,
+                [Globalization.CultureInfo]::InvariantCulture,
+                [ref]$selectedId
+            ) -or $selectedId -lt 1) {
+            Write-Host 'Enter a positive Hudu asset layout ID, or Q.' -ForegroundColor Red
+            continue
+        }
+
+        $listed = @($layouts | Where-Object { [int64]$_.id -eq $selectedId })
+        if ($listed.Count -ne 1) {
+            Write-Host 'That ID was not returned by Hudu. Refresh Hudu Asset Layouts and choose one of its current IDs.' -ForegroundColor Red
+            continue
+        }
+
+        try {
+            Add-DbmHuduAssetLayoutDetailsField -Id $selectedId -Confirm:$false -ErrorAction Stop | Out-Null
+            # Re-read rather than trusting the write: the field has to be
+            # there AND the layout has to be active before anything is saved.
+            $verified = Get-DbmHuduAssetLayout -Id $selectedId -ErrorAction Stop
+            if (-not (Test-DbmAssetLayoutIsReady -Layout $verified)) {
+                throw 'Hudu did not return an active layout with a RichText Asset Details field after the connection update.'
+            }
+            $Config.assetLayoutId = $selectedId
+            $Config.assetLayoutName = [string]$verified.name
+            Write-Host "Connected Hudu asset layout '$($Config.assetLayoutName)' (ID $selectedId). Existing customer fields and settings were preserved." -ForegroundColor Green
+            return $true
+        }
+        catch {
+            Write-Host "That layout could not be connected safely. $(ConvertTo-DbmBoundedDiagnosticText -Text $_.Exception.Message)" -ForegroundColor Red
+            Write-Host 'Choose a different layout, or enter Q to leave device assets disconnected.' -ForegroundColor Yellow
+        }
+    }
+}
+
+function Select-DbmAssetLayoutBinding {
+    <#
+        .SYNOPSIS
+        Create a new Hudu asset layout, or bind one that already exists.
+
+        .DESCRIPTION
+        The single chooser behind every place a layout gets bound, so setup,
+        run-menu option 9 and the missing-layout recovery cannot drift apart.
+
+        Option 2 is the reason this exists. An operator who already keeps
+        device assets in a Hudu layout had no way to point the tool at it and
+        had to accept a second, parallel layout. Hudu adds the required
+        RichText "Asset Details" field to the chosen layout automatically and
+        preserves everything else on it.
+
+        Returns the CONFIG, matching Complete-DbmAssetLayoutBinding so the
+        call sites stay a one-word swap. Cancelling leaves assetLayoutId
+        unset, which is how a caller tells the difference.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]$Config,
+        [Parameter(Mandatory)][scriptblock]$ReadInput
+    )
+
+    while ($true) {
+        Write-Host "`nDevice asset layout" -ForegroundColor Magenta
+        Write-Host '  1. Create a new Hudu asset layout' -ForegroundColor Yellow
+        Write-Host '  2. Use an existing Hudu asset layout' -ForegroundColor Yellow
+        Write-Host '     The required "Asset Details" field is added for you; your other fields are left alone.' -ForegroundColor DarkGray
+
+        $raw = [string](& $ReadInput 'Choose 1 or 2, or Q to cancel')
+        $answer = if ($null -eq $raw) { '' } else { $raw.Trim() }
+
+        switch ($answer) {
+            '1' { return Complete-DbmAssetLayoutBinding -Config $Config -ReadInput $ReadInput }
+            '2' {
+                # A cancelled or failed connect falls back to this menu rather
+                # than out of setup entirely: the operator picked the wrong
+                # layout, which is not a reason to make them start again.
+                if (Connect-DbmExistingAssetLayoutInteractive -Config $Config -ReadInput $ReadInput) { return $Config }
+            }
+            'Q' { return $Config }
+            'q' { return $Config }
+            default { Write-Host 'Enter 1, 2, or Q.' -ForegroundColor Red }
+        }
+    }
+}
+
 function ConvertTo-DbmRuntimeConfig {
     [CmdletBinding()]
     param([Parameter(Mandatory)]$InputObject)
