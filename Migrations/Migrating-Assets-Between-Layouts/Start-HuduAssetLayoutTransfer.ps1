@@ -3196,8 +3196,9 @@ foreach ($originalasset in $sourceassets) {
     }
     if ($true -eq $setsourceassetsarchived) {
         $assetsToArchive = if ($OnlyModifyExistingAssets) {
-            Write-Host "Only Modify Existing Assets mode: refreshing source layout assets before archive step so moved assets are not archived in the destination layout." -ForegroundColor Yellow
-            @(Get-HuduAssets -AssetLayoutId $sourceassetlayout.id | Where-Object { $_.archived -ne $true -and $_.id -in $sourceassets.id })
+            Write-Host "Only Modify Existing Assets mode: skipping source archival to preserve assets whose moves failed." -ForegroundColor Yellow
+            @()
+
         } else {
             @($sourceassets | Where-Object { $_.archived -ne $true })
         }
