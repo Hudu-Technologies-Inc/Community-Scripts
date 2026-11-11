@@ -12,9 +12,10 @@ $HuduBaseURL = $HuduBaseURL ?? $(read-host "Enter Hudu Base URL")
 $MapboxAccessToken = $MapboxAccessToken ?? $(read-host "Enter Mapbox Public API key")
 $GeoArticleNaming = "#COMPANYNAME Locations"
 $DownloadTiles = $true
-$preferredStyle = "mapbox/satellite-v9"
+$preferredStyle = "mapbox/dark-v11"
 # available styles: any custom ones in your mapbox account can be used,
-# mapbox/standard-satellite, mapbox/dark-v11, mapbox/navigation-night-v1, mapbox/navigation-day-v1, mapbox/outdoors-v12 are but a few examples of styles you can use!
+# mapbox/satellite-v9, mapbox/dark-v11, mapbox/navigation-night-v1, mapbox/navigation-day-v1, mapbox/outdoors-v12 are but a few examples of styles you can use!
+# Articles use standard images with numbered markers rendered by Mapbox, plus a linked location list.
 
 ######################### Location Layout
 # your hudu asset layout should have a name like one of these [case-insensitive]. if you dont have a location-type layout, we can 
@@ -32,8 +33,6 @@ $ZipNames =  @('postal code','zip code','zipcode','zip','postcode','cp','code po
 $CountryNames = @('country','country name','nation','país','pais','land','paese')
 
 
-$workdir = $PSScriptRoot
-
 function Build-MapboxStaticUrl {
   param(
     [Parameter(Mandatory)] [string] $Style,      # e.g. 'mapbox/light-v11'
@@ -43,17 +42,29 @@ function Build-MapboxStaticUrl {
     [Parameter(Mandatory)] [int]    $Width,
     [Parameter(Mandatory)] [int]    $Height,
     [Parameter(Mandatory)] [string] $AccessToken,
-    [object[]] $Pins = @()                       # ignored on purpose (no pins)
+    [object[]] $Pins = @(),
+    [switch] $Retina
   )
-  $lonC = '{0:F6}' -f $CenterLon
-  $latC = '{0:F6}' -f $CenterLat
-  return ('https://api.mapbox.com/styles/v1/{0}/static/{1},{2},{3}/{4}x{5}?access_token={6}' -f `
-    $Style, $lonC, $latC, $Zoom, $Width, $Height, $AccessToken)
+  if ($Pins.Count -gt 99) { throw 'A static map can contain at most 99 numbered markers. Split the locations into batches.' }
+  $culture = [Globalization.CultureInfo]::InvariantCulture
+  $overlays = for ($i = 0; $i -lt $Pins.Count; $i++) {
+    $pin = $Pins[$i]
+    $color = (Sanitize-Hex ([string]$pin.Color)).TrimStart('#')
+    $size = if ($pin.IsMain) { 'l' } else { 's' }
+    [string]::Format($culture, 'pin-{0}-{1}+{2}({3:F6},{4:F6})', $size, ($i + 1), $color, [double]$pin.Lon, [double]$pin.Lat)
+  }
+  $overlayPath = if ($overlays) { ($overlays -join ',') + '/' } else { '' }
+  $scale = if ($Retina) { '@2x' } else { '' }
+  $url = [string]::Format($culture, 'https://api.mapbox.com/styles/v1/{0}/static/{1}{2:F6},{3:F6},{4:0.####}/{5}x{6}{7}.png?access_token={8}',
+    $Style, $overlayPath, $CenterLon, $CenterLat, $Zoom, $Width, $Height, $scale, [Uri]::EscapeDataString($AccessToken))
+  if ($url.Length -gt 8192) { throw 'The Mapbox static image URL exceeds the 8,192-character limit.' }
+  return $url
 }
 function Sanitize-Hex([string]$hex,[string]$fallback='#ff4e4e') {
   if ([string]::IsNullOrWhiteSpace($hex)) { return $fallback }
   $h = $hex.Trim()
   if ($h.StartsWith('#')) { $h = $h.Substring(1) }
+  if ($h -match '^[0-9A-Fa-f]{8}$') { $h = $h.Substring(0,6) }
   if ($h.Length -eq 3) { $h = "$($h[0])$($h[0])$($h[1])$($h[1])$($h[2])$($h[2])" }
   if ($h.Length -ne 6 -or ($h -notmatch '^[0-9A-Fa-f]{6}$')) { return $fallback }
   "#$h"
@@ -75,145 +86,29 @@ function Darken-Hex([string]$hex,[double]$factor=0.65) {
 function New-MapHtml {
   param(
     [Parameter(Mandatory)] [object[]] $Points,
-    [Parameter(Mandatory)] [string]   $BackgroundUrl,
-    [Parameter(Mandatory)] [double]   $CenterLon,
-    [Parameter(Mandatory)] [double]   $CenterLat,
-    [Parameter(Mandatory)] [double]   $Zoom,
+    [Parameter(Mandatory)] [string] $BackgroundUrl,
     [int] $Width = 1200,
-    [int] $Height = 800,
-    [ValidateSet(256,512)] [int] $TileSize = 512,
-    [switch] $ShowLabels,
-    [switch] $AsDocument,
-    [switch] $DotShadow,
-    [switch] $ShowSidebar,
-    [int]    $SidebarWidth = 300    # px
+    [int] $Height = 800
   )
 
-  # ---- projection helpers ----
-  $worldPx = $TileSize * [math]::Pow(2, $Zoom)
-  $cPx = ((($CenterLon + 180.0) / 360.0) * $worldPx)
-  $radC = [math]::PI * $CenterLat / 180.0
-  $cPy = ((1.0 - [math]::Log([math]::Tan($radC) + 1.0/[math]::Cos($radC)) / [math]::PI) / 2.0) * $worldPx
-
-  function Project([double]$lon,[double]$lat){
-    $px = ((($lon + 180.0) / 360.0) * $worldPx)
-    $rad = [math]::PI * $lat / 180.0
-    $py = ((1.0 - [math]::Log([math]::Tan($rad) + 1.0/[math]::Cos($rad)) / [math]::PI) / 2.0) * $worldPx
-    [pscustomobject]@{ X=[math]::Round(($px-$cPx)+($Width/2.0),2); Y=[math]::Round(($py-$cPy)+($Height/2.0),2) }
-  }
-  function Get-Prop { param($o,[string[]]$names)
-    foreach ($n in $names) {
-      if ($o -is [hashtable]) { if ($o.ContainsKey($n)) { return $o[$n] } }
-      else { $p=$o.PSObject.Properties | Where-Object { $_.Name -ieq $n } | Select-Object -First 1; if ($p){ return $p.Value } }
-    }; $null
-  }
-
-  # ---- build the SVG map (left column) ----
-  $svg = New-Object Text.StringBuilder
-  $null = $svg.AppendLine("<svg xmlns='http://www.w3.org/2000/svg' xmlns:xlink='http://www.w3.org/1999/xlink' width='$Width' height='$Height' viewBox='0 0 $Width $Height'>")
-  $null = $svg.AppendLine(@"
-  <defs>
-    <style>
-      .lbl { font:12px/1.2 -apple-system,Segoe UI,Roboto,sans-serif; fill:#$(if ($preferredStyle -ilike "*dark*"){"fff"} else {"111"}); paint-order:stroke; stroke:#fff; stroke-width:.8px }
-      a { cursor:pointer }
-    </style>
-    <filter id="textShadow" x="-50%" y="-50%" width="200%" height="200%">
-      <feDropShadow dx="0" dy="0" stdDeviation="2.2" flood-color="#000000" flood-opacity="0.55"/>
-    </filter>
-    <filter id="dotShadow" x="-50%" y="-50%" width="200%" height="200%">
-      <feDropShadow dx="0" dy="1" stdDeviation="1.4" flood-color="#000000" flood-opacity="0.35"/>
-    </filter>
-  </defs>
-"@)
-  $null = $svg.AppendLine("  <image x='0' y='0' width='$Width' height='$Height' href='$BackgroundUrl'/>")
-  $null = $svg.AppendLine('  <g id="points">')
-
-  # also build sidebar rows while we loop
-  $rows = New-Object System.Collections.Generic.List[string]
-
-  foreach ($p in $Points) {
-    $lon=[double]($p.Lon ?? $p['lon']); $lat=[double]($p.Lat ?? $p['lat'])
-    $pt = Project $lon $lat
-    $titleRaw = [string](Get-Prop $p @('Name','name','title','label'))
-    $title = [System.Security.SecurityElement]::Escape($titleRaw)
-    $hrefV = (Get-Prop $p @('Url','url','href','link'))
-    $href  = [System.Security.SecurityElement]::Escape([string]($hrefV ?? "https://www.google.com/maps/search/?api=1&query=$lat,$lon"))
-
-    $isMain = $false
-    if ($p.PSObject -and $p.PSObject.Properties['isMain']) { $isMain = [bool]$p.isMain }
-    elseif ($p -is [hashtable] -and $p.ContainsKey('isMain')) { $isMain = [bool]$p['isMain'] }
-
-    $rawHex = [string](Get-Prop $p @('Color','color','Hex','hex','colour','markerColor'))
-    $defaultFill = ($isMain ? '#ffd000ff' : '#ff4e4e')
-    $fill   = Sanitize-Hex $rawHex $defaultFill
-    $stroke = Darken-Hex  $fill 0.55
-
-    $radius = $isMain ? 7 : 5
-    $dotFilter = ($DotShadow ? " filter='url(#dotShadow)'" : "")
-    $label  = if ($ShowLabels) {
-      "<text class='lbl' filter='url(#textShadow)' x='$([math]::Round($pt.X+8,2))' y='$([math]::Round($pt.Y-8,2))'>$title</text>"
-    } else { "" }
-
-    # Map marker
-    $null = $svg.AppendLine(
-      "    <a xlink:href='$href' target='_blank' rel='noopener'>" +
-      "<circle cx='$($pt.X)' cy='$($pt.Y)' r='$radius' fill='$fill' stroke='$stroke' stroke-width='1.4'$dotFilter><title>$title</title></circle>" +
-      $label + "</a>"
-    )
-
-    # Sidebar row (small bullet + truncated label)
-    if ($ShowSidebar) {
-      $shortTitle = if ($titleRaw.Length -gt 60) { $titleRaw.Substring(0,57) + '…' } else { $titleRaw }
-      $safeShort  = [System.Security.SecurityElement]::Escape($shortTitle)
-      $row = "<a class='row' href='$href' target='_blank' rel='noopener'>" +
-             "<span class='dot' style='background:$fill;border-color:$stroke'></span>" +
-             "<span class='txt'>$safeShort</span></a>"
-      [void]$rows.Add($row)
+  # Use normal article blocks. Inline SVG and style blocks are not preserved by every editor schema.
+  $imageUrl = [Net.WebUtility]::HtmlEncode($BackgroundUrl)
+  $html = [Text.StringBuilder]::new()
+  [void]$html.AppendLine("<img src='$imageUrl' alt='Locations map with numbered markers' width='$Width' height='$Height' />")
+  [void]$html.AppendLine("<p><a href='$imageUrl'>Open full-size map</a></p>")
+  [void]$html.AppendLine('<h3>Locations</h3><ol>')
+  foreach ($point in $Points) {
+    $name = [Net.WebUtility]::HtmlEncode([string]$point.Name)
+    $url = [string]$point.Url
+    if ([string]::IsNullOrWhiteSpace($url)) {
+      $url = [string]::Format([Globalization.CultureInfo]::InvariantCulture,
+        'https://www.google.com/maps/search/?api=1&query={0},{1}', $point.Lat, $point.Lon)
     }
+    $href = [Net.WebUtility]::HtmlEncode($url)
+    [void]$html.AppendLine("<li><p><a href='$href'>$name</a></p></li>")
   }
-
-  $null = $svg.AppendLine('  </g></svg>')
-  $svgStr = $svg.ToString()
-
-  # ---- layout: map + sidebar ----
-  $sidebarHtml = if ($ShowSidebar) {
-@"
-  <aside class="side">
-    <div class="side-head">Locations</div>
-    <div class="side-list">
-      $( ($rows -join "`n") )
-    </div>
-  </aside>
-"@
-  } else { "" }
-
-  $layoutCss = @"
-  <style>
-    .wrap { display:flex; gap:16px; align-items:flex-start; }
-    .map { flex:1 1 auto; min-width:0; }
-    .map svg { width:100%; height:auto; display:block; }
-    .side { flex:0 0 ${SidebarWidth}px; max-width:${SidebarWidth}px; font:13px/1.3 -apple-system,Segoe UI,Roboto,sans-serif; }
-    .side-head { font-weight:600; margin-bottom:8px; }
-    .side-list { max-height:${Height}px; overflow:auto; border:1px solid #e5e5e5; border-radius:10px; padding:6px; background:#fff }
-    .row { display:flex; align-items:center; gap:8px; text-decoration:none; color:#111; padding:6px 8px; border-radius:8px; }
-    .row:hover { background:#f5f7fb; }
-    .dot { width:10px; height:10px; border-radius:50%; border:1px solid transparent; display:inline-block; }
-    .txt { display:inline-block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:${SidebarWidth - 40}px; }
-    @media (max-width: 900px) {
-      .wrap { flex-direction:column; }
-      .side { width:100%; max-width:100%; }
-      .txt { max-width: calc(100% - 40px); }
-    }
-  </style>
-"@
-
-  $content = "<div class='wrap'><div class='map'>$svgStr</div>$sidebarHtml</div>"
-
-  if ($AsDocument) {
-    return "<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>$layoutCss</head><body>$content</body></html>"
-  } else {
-    return "$layoutCss$content"
-  }
+  [void]$html.AppendLine('</ol>')
+  return $html.ToString()
 }
 
 
@@ -224,150 +119,155 @@ function ProcessLocationsTOHtml {
   [CmdletBinding()]
   param(
     [Parameter(Mandatory)] [object[]] $Points,
+    [Parameter(Mandatory)] [ValidateRange(1,2147483647)] [int] $ArticleId,
     [string] $Style = 'mapbox/light-v11',
-    [int]    $Width = 1200,
-    [int]    $Height = 800,
-    [int]    $PaddingPx = 60,
-    [int]    $SinglePointZoom = 12,
+    [ValidateRange(1,1280)] [int] $Width = 1200,
+    [ValidateRange(1,1280)] [int] $Height = 800,
+    [int] $PaddingPx = 60,
+    [int] $SinglePointZoom = 12,
     [double] $ZoomBias = 0.0,
     [ValidateSet(256,512)] [int] $TileSize = 512,
     [switch] $Retina,
-    [int]    $CompanyId,
+    [int] $CompanyId,
     [switch] $ShowLabels,
     [switch] $VerboseUrl
   )
 
-  if (-not $Points) { throw "No points provided." }
-  if ([string]::IsNullOrWhiteSpace($MapboxAccessToken)) { throw "MapboxAccessToken is empty." }
+  if (-not $Points) { throw 'No points provided.' }
+  if ([string]::IsNullOrWhiteSpace($MapboxAccessToken)) { throw 'MapboxAccessToken is empty.' }
 
-  # --- normalize points into $pts ---
-  function Get-Prop { param($o,[string[]]$names)
-    foreach ($n in $names) {
-      if ($o -is [hashtable]) { if ($o.ContainsKey($n)) { return $o[$n] } }
-      else { $p=$o.PSObject.Properties | Where-Object { $_.Name -ieq $n } | Select-Object -First 1; if ($p){ return $p.Value } }
-    }; $null
-  }
-  function Normalize-Point { param([double]$Lon,[double]$Lat)
-    if ([math]::Abs($Lat) -gt 90 -and [math]::Abs($Lon) -le 90) { $t=$Lon; $Lon=$Lat; $Lat=$t }
-    if ($Lat -gt 85.05112878) { $Lat = 85.05112878 }
-    if ($Lat -lt -85.05112878) { $Lat = -85.05112878 }
-    [pscustomobject]@{ Lon=$Lon; Lat=$Lat }
-  }
-  function LonToMX([double]$lon) { ($lon + 180.0) / 360.0 }
-  function LatToMY([double]$lat) {
-    $rad = [math]::PI/180.0 * $lat
-    (1.0 - [math]::Log([math]::Tan($rad) + 1.0/[math]::Cos($rad)) / [math]::PI) / 2.0
-  }
-  function MYToLat([double]$my) {
-    $n = [math]::PI * (1 - 2*$my)
-    (180.0 / [math]::PI) * [math]::Atan([math]::Sinh($n))
-  }
-
-  $pts = foreach ($p in $Points) {
-    $lonRaw = Get-Prop $p @('lon','longitude','x')
-    $latRaw = Get-Prop $p @('lat','latitude','y')
-    if ($lonRaw -ne $null -and $latRaw -ne $null) {
-      $lon=[double]::Parse("$lonRaw",[Globalization.CultureInfo]::InvariantCulture)
-      $lat=[double]::Parse("$latRaw",[Globalization.CultureInfo]::InvariantCulture)
-      $n = Normalize-Point -Lon $lon -Lat $lat
-      [pscustomobject]@{
-        Name = (Get-Prop $p @('name','title','label'))
-        Url  = (Get-Prop $p @('url','href','link'))
-        Lon  = $n.Lon
-        Lat  = $n.Lat
+  function Get-Prop {
+    param($Object, [string[]]$Names)
+    foreach ($name in $Names) {
+      if ($Object -is [hashtable]) {
+        if ($Object.ContainsKey($name)) { return $Object[$name] }
+      } else {
+        $property = $Object.PSObject.Properties[$name]
+        if ($property) { return $property.Value }
       }
     }
+    return $null
+  }
+  function LonToMX([double]$Lon) { ($Lon + 180.0) / 360.0 }
+  function LatToMY([double]$Lat) {
+    $rad = [math]::PI / 180.0 * $Lat
+    (1.0 - [math]::Log([math]::Tan($rad) + 1.0 / [math]::Cos($rad)) / [math]::PI) / 2.0
   }
 
-  # ---- fit center & fractional zoom using THIS $pts/$Width/$Height ----
-  $mx = @(); $my = @()
-  foreach ($p in $pts) { $mx += LonToMX $p.Lon; $my += LatToMY $p.Lat }
+  $culture = [Globalization.CultureInfo]::InvariantCulture
+  $pts = @(foreach ($point in $Points) {
+    $lonRaw = Get-Prop $point @('lon','longitude','x')
+    $latRaw = Get-Prop $point @('lat','latitude','y')
+    if ($null -eq $lonRaw -or $null -eq $latRaw) { continue }
+    $normalized = Normalize-Point -Lon ([double]::Parse("$lonRaw", $culture)) -Lat ([double]::Parse("$latRaw", $culture))
+    $isMain = [bool](Get-Prop $point @('isMain','main'))
+    $defaultColor = if ($isMain) { '#ffd000' } else { '#ff4e4e' }
+    [pscustomobject]@{
+      Name = [string](Get-Prop $point @('name','title','label'))
+      Url = Get-Prop $point @('url','href','link')
+      Lon = $normalized.Lon
+      Lat = $normalized.Lat
+      IsMain = $isMain
+      Color = Sanitize-Hex ([string](Get-Prop $point @('color','hex','colour','markerColor'))) $defaultColor
+    }
+  })
+  if (-not $pts.Count) { throw 'No valid coordinates provided.' }
 
-  $minMX = ($mx | Measure-Object -Minimum).Minimum
-  $maxMX = ($mx | Measure-Object -Maximum).Maximum
-  $minMY = ($my | Measure-Object -Minimum).Minimum
-  $maxMY = ($my | Measure-Object -Maximum).Maximum
+  # Mapbox supports numeric marker labels 1-99. Each map has its own matching location list.
+  $mapCount = [int][math]::Ceiling($pts.Count / 99.0)
+  $fragments = [Collections.Generic.List[string]]::new()
+  for ($offset = 0; $offset -lt $pts.Count; $offset += 99) {
+    $last = [math]::Min($offset + 98, $pts.Count - 1)
+    $batch = @($pts[$offset..$last])
+    $mapNumber = [int]($offset / 99) + 1
+    $mx = @($batch | ForEach-Object { LonToMX $_.Lon })
+    $my = @($batch | ForEach-Object { LatToMY $_.Lat })
+    $boundsX = $mx | Measure-Object -Minimum -Maximum
+    $boundsY = $my | Measure-Object -Minimum -Maximum
+    $dMX = $boundsX.Maximum - $boundsX.Minimum
+    $dMY = $boundsY.Maximum - $boundsY.Minimum
+    $centerLon = (($boundsX.Minimum + $boundsX.Maximum) / 2.0) * 360.0 - 180.0
+    $centerMY = ($boundsY.Minimum + $boundsY.Maximum) / 2.0
+    $centerLat = (180.0 / [math]::PI) * [math]::Atan([math]::Sinh([math]::PI * (1 - 2 * $centerMY)))
 
-  $innerW = [math]::Max($Width  - 2*$PaddingPx, 1)
-  $dMX = [math]::Max($maxMX - $minMX, 1e-12)
-  $dMY = [math]::Max($maxMY - $minMY, 1e-12)
+    if ($batch.Count -eq 1 -or ($dMX -lt 1e-12 -and $dMY -lt 1e-12)) {
+      $zoom = [double]$SinglePointZoom
+    } else {
+      $innerW = [math]::Max($Width - 2 * $PaddingPx, 1)
+      $innerH = [math]::Max($Height - 2 * $PaddingPx, 1)
+      $zX = [math]::Log($innerW / ($TileSize * [math]::Max($dMX, 1e-12)), 2)
+      $zY = [math]::Log($innerH / ($TileSize * [math]::Max($dMY, 1e-12)), 2)
+      $zoom = [math]::Min($zX, $zY)
+    }
+    $zoom = [math]::Min([math]::Max($zoom - $ZoomBias, 0), 22)
+    $url = Build-MapboxStaticUrl -Style $Style -CenterLon $centerLon -CenterLat $centerLat -Zoom $zoom `
+      -Width $Width -Height $Height -AccessToken $MapboxAccessToken -Pins $batch -Retina:$Retina
+    if ($VerboseUrl) { Write-Host "STATIC URL: $($url -replace '(access_token=)[^&]+', '${1}[redacted]')" -ForegroundColor Cyan }
 
-  if ($pts.Count -eq 1) {
-    $z = [double][int]$SinglePointZoom
+    $pngPath = Join-Path ([IO.Path]::GetTempPath()) "$([guid]::NewGuid().ToString('N'))-geodata.png"
+    try {
+      Write-Host "Article ${ArticleId}: downloading map $mapNumber/$mapCount with $($batch.Count) markers (zoom $($zoom.ToString('0.##', $culture)))..."
+      Invoke-WebRequest -Uri $url -OutFile $pngPath -TimeoutSec 60 -ErrorAction Stop | Out-Null
+      $bytes = [IO.File]::ReadAllBytes($pngPath)
+      if ($bytes.Length -lt 24 -or [Convert]::ToHexString([byte[]]$bytes[0..7]) -ne '89504E470D0A1A0A') {
+        throw "Mapbox did not return a PNG image for article $ArticleId."
+      }
+      Write-Host "Article ${ArticleId}: downloaded $($bytes.Length) bytes; uploading public photo..."
+      $photo = New-HuduPublicPhoto -FilePath $pngPath -RecordType 'Article' -RecordId $ArticleId -ErrorAction Stop
+      $photo = $photo.public_photo ?? $photo
+      $photoId = [string]($photo.slug ?? $photo.id)
+      if ([string]::IsNullOrWhiteSpace($photoId)) { throw "No public photo ID returned for article $ArticleId." }
+      $photoUrl = "/public_photo/$([Uri]::EscapeDataString($photoId))"
+      Write-Host "Article ${ArticleId}: uploaded map $mapNumber/$mapCount to $photoUrl"
+    } finally {
+      Remove-Item -LiteralPath $pngPath -ErrorAction SilentlyContinue
+    }
+
+    if ($mapCount -gt 1) { $fragments.Add("<h2>Map $mapNumber of $mapCount</h2>") }
+    $fragments.Add((New-MapHtml -Points $batch -BackgroundUrl $photoUrl -Width $Width -Height $Height))
+  }
+  return $fragments -join "`n"
+}
+
+function Set-HuduLocationMapArticle {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)] [string] $Name,
+    [Parameter(Mandatory)] [object[]] $Points,
+    [string] $Style = 'mapbox/light-v11',
+    [Nullable[int]] $CompanyId
+  )
+
+  $articleRequest = @{ Name = $Name }
+  if ($null -ne $CompanyId) { $articleRequest.CompanyId = $CompanyId }
+  $articles = @(Get-HuduArticles @articleRequest -ErrorAction Stop | ForEach-Object { $_.article ?? $_ })
+  if ($null -eq $CompanyId) {
+    $articles = @($articles | Where-Object { -not $_.company_id })
+  }
+  $article = $articles | Select-Object -First 1
+
+  # Existing articles keep their content until the replacement map is ready.
+  if (-not $article) {
+    $article = New-HuduArticle @articleRequest -Content '<p>Generating location map...</p>' -ErrorAction Stop
+    $article = $article.article ?? $article
+    Write-Host "Created placeholder article '$Name' (id $($article.id))."
   } else {
-    $zX = [math]::Log(($innerW / ($TileSize * $dMX)), 2)
-    $zY = [math]::Log(($innerH / ($TileSize * $dMY)), 2)
-    $z  = [math]::Min($zX, $zY)
-    if ($PSBoundParameters.ContainsKey('ZoomBias')) { $z -= $ZoomBias }
+    Write-Host "Updating map for '$Name' (article $($article.id))."
   }
+  if (-not $article.id) { throw "No article ID returned for '$Name'." }
 
-
-  
-  $cMX = ($minMX + $maxMX) / 2.0
-  $cMY = ($minMY + $maxMY) / 2.0
-  $centerLon = $cMX * 360.0 - 180.0
-  $centerLat = MYToLat $cMY
-
-  # Inner viewport after padding
-  $innerW = [math]::Max($Width  - 2*$PaddingPx, 1)
-  $innerH = [math]::Max($Height - 2*$PaddingPx, 1)
-
-  # BBox span in normalized mercator; avoid 0 with a tiny epsilon
-  $eps  = 1e-9
-  $dMX  = [math]::Max($maxMX - $minMX, $eps)
-  $dMY  = [math]::Max($maxMY - $minMY, $eps)
-
-  # Ratios for zoom fit; clamp floors so Log never sees 0
-  $ratioX = [math]::Max($innerW / ($TileSize * $dMX), $eps)
-  $ratioY = [math]::Max($innerH / ($TileSize * $dMY), $eps)
-
-  $zX = [math]::Log($ratioX, 2)
-  $zY = [math]::Log($ratioY, 2)
-  $z  = [math]::Min($zX, $zY)   # fractional zoom OK
-
-  # Optional zoom-out bias
-  if ($PSBoundParameters.ContainsKey('ZoomBias')) { $z -= $ZoomBias }
-
-  # Fallbacks if anything went weird
-  if ([double]::IsNaN($z) -or [double]::IsInfinity($z)) { $z = [double][int]$SinglePointZoom }
-
-  # Clamp to Mapbox’s sane range (0–22)
-  $z = [math]::Min([math]::Max($z, 0), 22)
-
-  # Format invariant for the URL
-  $zStr = [string]::Format([Globalization.CultureInfo]::InvariantCulture, '{0:0.####}', $z)
-
-
-  # --- build URL using ONLY locals ---
-  $u = Build-MapboxStaticUrl `
-        -Style $Style `
-        -CenterLon $centerLon -CenterLat $centerLat -Zoom $zStr `
-        -Width $Width -Height $Height `
-        -AccessToken $MapboxAccessToken `
-        -Pins $pts
-
-  Write-Host "STATIC URL: $u" -ForegroundColor Cyan
-  $pts | ForEach-Object { Write-Host (" pin lon={0:F6} lat={1:F6} name='{2}'" -f $_.Lon,$_.Lat,($_.Name)) }
-
-  if ($true -eq $DownloadTiles){
-    $pngPath ="$workdir\$(get-random -Minimum 1111111 -Maximum 9999999)-geodata.png"
-    write-host "map downloaded uploaded as $($pngPath)"
-    Invoke-WebRequest -Uri "$u" -OutFile "$pngPath" -TimeoutSec 60
-
-    $publicphoto = $(New-HuduPublicPhoto -FilePath $pngPath).public_photo
-    $u = $publicphoto.url ?? $u
-    write-host "using $u for static image URL"
+  # Resolve embedded image sources locally, then send only the final content.
+  $htmlBody = ProcessLocationsTOHtml -Points $Points -ArticleId $article.id -ShowLabels -Style $Style
+  if ([string]::IsNullOrWhiteSpace($htmlBody)) { throw "No map content generated for '$Name'." }
+  $imageCount = [regex]::Matches($htmlBody, '<img\b').Count
+  Write-Host "Article $($article.id): saving final content with $imageCount map image(s)..."
+  $result = Set-HuduArticle @articleRequest -Id $article.id -Content $htmlBody -ErrorAction Stop
+  $savedArticle = $result.article ?? $result
+  if ($null -ne $savedArticle.content -and [regex]::Matches([string]$savedArticle.content, '<img\b').Count -ne $imageCount) {
+    throw "Article $($article.id) was updated, but Hudu's response did not retain all $imageCount map image(s)."
   }
-
-    # --- render SVG using the SAME locals ---
-  $html = New-MapHtml `
-    -Points $points `
-    -BackgroundUrl $u `
-    -CenterLon $centerLon -CenterLat $centerLat -Zoom $zStr `
-    -Width $Width -Height $height -TileSize $TileSize `
-    -ShowLabels -ShowSidebar -SidebarWidth 280 -DotShadow -AsDocument
-
-  return $html
+  Write-Host "Article $($article.id): final content saved."
+  return $result
 }
 
 function Get-HuduModule {
@@ -695,33 +595,20 @@ foreach ($c in $($AllCompanies | Where-Object {-not ([string]::IsNullOrWhiteSpac
         
     }
     $articleName = $GeoArticleNaming -replace "#COMPANYNAME", "$($c.name)"
-    $existingCompanyArticle = $(Get-HuduArticles -CompanyId $c.id -name $articleName | Select-Object -First 1); $existingCompanyArticle = $existingCompanyArticle.article ?? $existingCompanyArticle;
     if (-not $companyAddresses -or $companyAddresses.count -lt 1){write-host "No geodata to map for company $($c.name)."; continue}
     $articleGeodata = Get-GeocodeCollection -MapboxAccessToken $MapboxAccessToken -Addresses $companyAddresses
     if (-not $articleGeodata -or $articleGeodata.count -lt 1){write-host "No geodata to map for company $($c.name)."; continue}
 
-    $htmlbody  = ProcessLocationsTOHtml -Points $articleGeodata -ShowLabels -Style $preferredStyle
-    
-    if ($htmlbody) {
-        if ($existingCompanyArticle){
-            Set-HuduArticle -companyId $c.id -id $existingCompanyArticle.id -name $articleName -content "$htmlbody"
-        } else {
-            New-HuduArticle  -companyId $c.id -name $articleName -content "$htmlbody"
-        }
-    }
+    $r = Set-HuduLocationMapArticle -Name $articleName -CompanyId $c.id -Points $articleGeodata -Style $preferredStyle
 }
 $globalArticleName = $GeoArticleNaming -replace "#COMPANYNAME", "Global"
 
-$existingGlobalArticle = $(Get-HuduArticles -name $globalArticleName | Select-Object -First 1); $existingGlobalArticle = $existingGlobalArticle.article ?? $existingGlobalArticle;
 $globalGeoData = Get-GeocodeCollection -MapboxAccessToken $MapboxAccessToken -Addresses $AllAddresses
-$htmlbody  = ProcessLocationsTOHtml -Points $globalGeoData -ShowLabels  -Style $preferredStyle
-
-if ($existingGlobalArticle){
-    Write-Host "updating article for global KB Map with $($AllAddresses.count) company addresses"
-    $r = Set-HuduArticle -id $existingGlobalArticle.id -name $globalArticleName -Content "$htmlbody"
+if ($globalGeoData -and $globalGeoData.Count -gt 0) {
+    Write-Host "Saving global KB map with $($AllAddresses.count) company addresses"
+    $r = Set-HuduLocationMapArticle -Name $globalArticleName -Points $globalGeoData -Style $preferredStyle
 } else {
-    Write-Host "Creating global article global KB Map with $($AllAddresses.count) company addresses"
-    $r = New-HuduArticle -name $globalArticleName -Content "$htmlbody"
+    Write-Host 'No geodata to map for the global KB.'
 }
 
 $HuduApikey = $null
