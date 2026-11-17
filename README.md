@@ -34,7 +34,7 @@ Collection of Hudu Community Scripts for anyone to use/run/remix/reference.
 
 - **Magic Dashes**
   - [Datto BCDR Magic Dash](Magic-Dash/Datto-MD/Datto-BCDR-MD.zip)
-  - [Axcient Magic Dash](Magic-Dash/Axcient-MD/Axcient-MD.zip)
+  - [Axcient Magic Dash](Magic-Dash/Axcient-MD/)
 
 - **Migrations**
   - [ITGlue → Hudu Migration](https://github.com/Hudu-Technologies-Inc/ITGlue-Hudu-Migration/blob/main/README.md)
