@@ -37,7 +37,7 @@ In the default transfer mode, the tool creates or updates destination-layout ass
 - Public photos
 - Related photos
 
-> Photo relinking requires Hudu `2.45.0` or later.
+> Photo relinking requires Hudu `2.41.0` or later.
 
 ## Transfer Modes
 
@@ -73,6 +73,7 @@ Important tradeoffs:
 - A Hudu base URL
 - A Hudu API key
 - An existing source layout and destination layout
+- Network access to refresh the HuduAPI fork from GitHub during initialization; Git is an optional fallback if the repository archive cannot be downloaded
 
 For best results, use a full-permission API key rather than a narrowly scoped company-only key.
 
@@ -92,7 +93,9 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File .\Start-HuduAssetLayoutTransfer.ps
 
 To launch from Explorer, double-click `Start-HuduAssetLayoutTransfer.cmd`. The command launcher finds PowerShell 7 and starts the GUI script with `pwsh.exe`.
 
-<img width="808" height="338" alt="image" src="https://github.com/user-attachments/assets/4478221e-9087-49d1-98cf-0e976ac926f5" />
+The initializer is embedded in `Start-HuduAssetLayoutTransfer.ps1`, so the main script can run on its own. `Build.ps1` packages that same script in the single-file executable.
+
+<img width="404" height="169" alt="Launch screen" src="https://github.com/user-attachments/assets/732b0873-4c1c-42f2-b202-5cc362bdd6f8" />
 
 The tool opens a GUI window and a terminal window. The terminal is mainly there for logging and troubleshooting.
 
@@ -100,7 +103,11 @@ The tool opens a GUI window and a terminal window. The terminal is mainly there 
 
 Provide your Hudu URL and API key.
 
-<img width="798" height="340" alt="image" src="https://github.com/user-attachments/assets/daa8f0ca-cb67-4c47-9139-3446ecfe6c52" />
+The `Set-HuduModuleInitialized` function in the main script refreshes the HuduAPI fork on each initialization, validates the downloaded module, imports it, configures the connection, and confirms the server version. It tries the repository archive first and Git clone second. Initialization stops if neither method succeeds. There is no bundled HAPI ZIP or PowerShell Gallery fallback.
+
+The default fork is `https://github.com/Hudu-Technologies-Inc/HuduAPI.git` on `master`. `HUDUAPI_REPOSITORY_URL`, `HUDUAPI_REPOSITORY_BRANCH`, and `HUDUAPI_ZIP_URL` can override the download source. Programmatic calls to `Set-HuduModuleInitialized` can set `-HAPImodulePath` or opt into an existing complete fork with `-RefreshHuduApiForkEachRun $false`.
+
+<img width="399" height="170" alt="Connection prompt" src="https://github.com/user-attachments/assets/32d62e27-dde5-4957-897c-5c7c6a9628e9" />
 
 ### 3. Choose the source and destination layouts, transfer mode, source-archival strategy, and merge strategy
 
@@ -114,7 +121,7 @@ If you are confident with your source/dest selection, it's generally a good idea
 
 You will then get a confirmation step to review or change the selection.
 
-<img width="740" height="486" alt="image" src="https://github.com/user-attachments/assets/17817303-d7fe-4b8b-b691-ac784655c909" />
+<img width="1488" height="772" alt="image" src="https://github.com/user-attachments/assets/335ff802-1529-4d93-ab08-3d24d09b5532" />
 
 If an incoming source asset appears to match an existing destination asset, you can choose how the tool should behave.
 
@@ -129,25 +136,21 @@ You can match on any source field and any source field type. Dates, ListSelects,
 
 The form will hint the number of assets that fall under your chosen filter.
 
-<img width="1520" height="724" alt="image" src="https://github.com/user-attachments/assets/e5ceb71f-c724-4caa-9675-9fce6be468d1" />
-
+<img width="1520" height="724" alt="image" src="https://github.com/user-attachments/assets/7bc9709a-799d-459d-83a6-fc7c395faff7" />
 
 ### 4-C Set final strategies for fields, 'smoosh' application, and relations
 
-<img width="1610" height="738" alt="image" src="https://github.com/user-attachments/assets/589f8904-0a20-4446-82fc-43d91c0a6dba" />
+<img width="1610" height="738" alt="image" src="https://github.com/user-attachments/assets/b91add5c-12c1-4fba-9423-2784c5e81a40" />
 
 pretty straightforward, Including blank values in smoosh and keeping HTML intact is usually not desirable [depending on circumstances] and will be disabled if no smoosh source/target was selected. 
 
 Including relations for archived objects is also generally good to do.
 
-### 5. Review Transfer Plan / Mappings / Strategy
+### 5. Review field mappings
 
-If the source and destination layouts already line up closely, the tool may offer a direct transfer path.
+If the source and destination layouts already line up closely and neither layout has Number fields, the tool may offer a direct transfer path. Number fields use the mapping workflow so subtype validation is applied. Select `Only modify existing assets` there when asset IDs need to be preserved.
 
-<img width="1808" height="316" alt="image" src="https://github.com/user-attachments/assets/2d921d60-2436-412c-8a33-64b8e607aa51" />
-
-<img width="900" height="686" alt="image" src="https://github.com/user-attachments/assets/5bf150ea-82b3-4488-a2d8-a98d42f7f857" />
-
+<img width="904" height="158" alt="Direct transfer prompt" src="https://github.com/user-attachments/assets/f10aadba-25c0-4ab2-8669-29499d0577f6" />
 
 Otherwise, you will work through the field mapping wizard one destination field at a time.
 
@@ -179,6 +182,10 @@ Each destination field is reviewed in the GUI. For every field, choose one mappi
 - `SMOOSH`: combine multiple source fields into one destination field
 - `Skip`: leave the destination field unmapped
 
+`InstructionBlock` fields are skipped on both layouts. They contain static layout instructions, so they are excluded from source choices, destination review, and transferred asset values.
+
+Field choices and destination type details show Number subtypes (`Plain`, `Currency`, or `Percentage`), currency codes where applicable, and any configured minimum or maximum. The same details appear in source filtering, custom match choices, and the final mapping review. Field pickers use the original field labels when saving mappings.
+
 The mapping editor also shows a live snapshot of:
 
 - Configured destination fields
@@ -193,17 +200,31 @@ Use `Back` and `Next` to move through the review loop. `Back` discards any in-pr
 
 This is the most common path: pick a source field and optionally enable `Strip HTML`.
 
-<img width="1354" height="1244" alt="image" src="https://github.com/user-attachments/assets/97caf0d8-3aa9-4954-87c5-d3aad8be98e5" />
-
+<img width="677" height="622" alt="Standard source mapping" src="https://github.com/user-attachments/assets/89487473-75f9-4cad-9cd8-98506d3d916e" />
 
 Use `Strip HTML` when moving from rich text or embed-like source fields into plain text destination fields.
+
+### Number Destinations
+
+Number conversion uses the saved destination field's `number_type`, `currency_code`, `min`, and `max`, following the [ConvertTo-HuduNumber methodology](https://github.com/Hudu-Technologies-Inc/ITGlue-Hudu-Migration/blob/main/Public/ConvertTo-HuduNumber.ps1). The helpers are embedded in the main script so the standalone script and packaged executable share the same behavior.
+
+| Destination subtype | Conversion policy for Hudu 2.48.0 and later |
+| --- | --- |
+| Number | Preserve zero, signs, and decimal precision as numeric strings; reject values outside -9223372036854775807 through 9223372036854775807. |
+| Currency | Accept matching currency markers and round USD, EUR, or AUD to two decimal places, with midpoints away from zero. For example, USD `12.345` becomes `12.35`. Unknown currency precision is omitted. |
+| Percentage | Keep percentage points: `12.5%` becomes `12.5`, and `0.125` stays `0.125`. Negative values are allowed; values above 100 are omitted. |
+
+Destination bounds are checked after conversion and rounding. `min` and `max` are independent and inclusive: either bound can be set by itself, blank bounds are ignored, and zero is a valid bound. For plain Number fields (`number_type = number`), a returned `currency_code = USD` does not enable currency rounding. Unambiguous grouping, decimal separators, and scientific notation are supported. Ambiguous values such as `1,234`, arbitrary text such as `Asset #12`, booleans, collections, invalid metadata, and out-of-range values are omitted. Empty or invalid required Number fields do not receive a placeholder or null value. A valid constant or existing destination value can still supply the field under the selected merge policy.
+
+These checks apply to source mappings, constants, and existing values used during merges. Warnings report omissions, currency rounding, and values that already arrived as floating-point numbers with potentially lost precision. Numeric strings retain precision through JSON serialization.
+
+The transfer reads the Hudu server version before processing numeric fields. Older or unknown versions use the helper's conservative Int32 integer policy without rounding fractional input; percentage limits and destination bounds still apply. Programmatic calls to `New-NonInteractiveLayoutTransfer` can supply `-CurrentVersion` when the server version is already known.
 
 ### Constant Mapping
 
 Use this when a destination field should always receive the same value.
 
-<img width="1300" height="600" alt="image" src="https://github.com/user-attachments/assets/a33d3b14-bbac-437c-8486-10e1c919e890" />
-
+<img width="650" height="300" alt="Constant mapping" src="https://github.com/user-attachments/assets/407175b1-2ca3-4ba2-8d30-eff61b7045b0" />
 
 This is especially useful for required destination fields that have no good source equivalent.
 
@@ -213,11 +234,13 @@ For `ListSelect` destination fields, choose a source field and define which sour
 
 ##### ListMapping Examples
 
-<img width="1316" height="690" alt="image" src="https://github.com/user-attachments/assets/d0171f07-01bf-4526-ab57-912642338b65" />
+<img width="658" height="345" alt="ListSelect mapping" src="https://github.com/user-attachments/assets/8022ecd1-6761-4461-8a32-5cd1f665b021" />
 
 ---
 
-<img width="2104" height="1410" alt="image" src="https://github.com/user-attachments/assets/87a98a24-8103-4063-b243-357870636e60" />
+<img width="2104" height="1410" alt="image" src="https://github.com/user-attachments/assets/a1d6c22a-53cd-43fb-b404-d3bc7390d697" />
+
+
 
 This is helpful when the source data is inconsistent and needs to be normalized into one controlled list.
 
@@ -247,7 +270,7 @@ The tool builds the destination address object only when at least one address co
 
 `SMOOSH` lets you combine multiple source fields into one destination field. It is usually most useful for `RichText`, `Heading`, or other notes-style destinations.
 
-<img width="1368" height="1260" alt="image" src="https://github.com/user-attachments/assets/d206bb01-9aa7-4148-b0b1-ed4e50dfa75a" />
+<img width="684" height="630" alt="SMOOSH mapping" src="https://github.com/user-attachments/assets/6f5f6dc6-9441-494d-b40e-9cfbe2dd419f" />
 
 Example rich text output:
 
@@ -292,13 +315,11 @@ Very short names are intentionally not matched too aggressively.
 
 When custom matching criteria are enabled, those configured criteria replace the default name matcher. The transfer checks the primary criterion first, then secondary, then tertiary; blank source values are skipped for that criterion. Direct matching compares trimmed text case-insensitively, while the broader option matches when either value contains the other. If a criterion narrows the result to multiple destination assets, the next criterion is used to keep narrowing.
 
-<img width="1816" height="672" alt="image" src="https://github.com/user-attachments/assets/3cc213f5-d7cb-4054-9998-0694ac3c54c4" />
-
+<img width="1816" height="672" alt="image" src="https://github.com/user-attachments/assets/aecf94b3-b436-41c0-89b6-7845e2a353cb" />
 
 This matching logic helps prevent accidental duplicates while still allowing flexible merge behavior.
 
-<img width="1584" height="324" alt="image" src="https://github.com/user-attachments/assets/f989ea5c-7879-4007-9505-5aaa8189d863" />
-
+<img width="1584" height="324" alt="image" src="https://github.com/user-attachments/assets/35716e18-2a86-480a-a4e9-9dd41b75885d" />
 
 Matching is skipped when `Only modify existing assets` is selected, because the source asset itself is moved to the destination layout and keeps its existing asset ID.
 
