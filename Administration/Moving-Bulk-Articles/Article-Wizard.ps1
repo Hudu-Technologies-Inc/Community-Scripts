@@ -1657,7 +1657,7 @@ function Move-HuduArticleTree {
         }
     }
 
-    $report | Export-Csv -LiteralPath $effectiveReportPath -NoTypeInformation -Encoding UTF8
+    $report | Export-Csv -LiteralPath $effectiveReportPath -Encoding UTF8
 
     $summary = [PSCustomObject]@{
         Direction   = $Direction

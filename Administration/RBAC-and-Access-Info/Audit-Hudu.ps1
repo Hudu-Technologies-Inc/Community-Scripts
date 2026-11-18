@@ -393,43 +393,43 @@ try {
     # 1) RBAC “who can access what” (already one row per user)
     $PasswordAccessRows |
         Select-Object PasswordId,PasswordName,CompanyName,FolderName,FolderSecurity,FolderScope,UserEmail,ViaGroups,Archived |
-        Export-Csv (Join-Path $outputLocation 'password_access_rows.csv') -NoTypeInformation -Encoding utf8BOM
+        Export-Csv (Join-Path $outputLocation 'password_access_rows.csv') -Encoding utf8BOM
 
     # 2) Per-user counts
     $UserPasswordCounts |
         Select-Object UserEmail,AccessiblePasswords |
-        Export-Csv (Join-Path $outputLocation 'user_password_counts.csv') -NoTypeInformation -Encoding utf8BOM
+        Export-Csv (Join-Path $outputLocation 'user_password_counts.csv') -Encoding utf8BOM
 
     # 3) Per-folder summary (RBAC-only)
     $FolderPasswordCounts |
         Select-Object FolderId,FolderName,FolderSecurity,FolderScope,Passwords,UniqueUsers |
-        Export-Csv (Join-Path $outputLocation 'folder_password_counts.csv') -NoTypeInformation -Encoding utf8BOM
+        Export-Csv (Join-Path $outputLocation 'folder_password_counts.csv') -Encoding utf8BOM
 
     # 4) Per-company (RBAC-only)
     $CompanyPasswordCounts |
     Select-Object CompanyName,Passwords,Folders |
-    Export-Csv (Join-Path $outputLocation 'company_password_counts_rbac_only.csv') -NoTypeInformation -Encoding utf8BOM
+    Export-Csv (Join-Path $outputLocation 'company_password_counts_rbac_only.csv') -Encoding utf8BOM
 
     # 5) RBAC-only: passwords per folder (grouped)
     $PasswordsByFolder_RBAC |
     Select-Object FolderName,Count |
-    Export-Csv (Join-Path $outputLocation 'passwords_by_folder_rbac.csv') -NoTypeInformation -Encoding utf8BOM
+    Export-Csv (Join-Path $outputLocation 'passwords_by_folder_rbac.csv') -Encoding utf8BOM
 
     # 6) ALL passwords: per-company split (RBAC vs default)
     $CompanyCounts_All |
     Select-Object CompanyName,TotalPasswords,RBACPasswords,DefaultPasswords,RBACFolders |
-    Export-Csv (Join-Path $outputLocation 'company_counts_all.csv') -NoTypeInformation -Encoding utf8BOM
+    Export-Csv (Join-Path $outputLocation 'company_counts_all.csv') -Encoding utf8BOM
 
     # 7) Global folders
     $globalfolders |
     Select-Object id,name,security,
                     @{n='allowed_groups';e={ & $Join $_.allowed_groups }} |
-    Export-Csv (Join-Path $outputLocation 'global_folders.csv') -NoTypeInformation -Encoding utf8BOM
+    Export-Csv (Join-Path $outputLocation 'global_folders.csv') -Encoding utf8BOM
 
     # 8) Public articles
     $PublicArticles |
     Select-Object Name,Company,PublicUrl |
-    Export-Csv (Join-Path $outputLocation 'public_articles.csv') -NoTypeInformation -Encoding utf8BOM
+    Export-Csv (Join-Path $outputLocation 'public_articles.csv') -Encoding utf8BOM
 
     Write-Host "Wrote CSVs to: $outputLocation" -ForegroundColor Green    
 
